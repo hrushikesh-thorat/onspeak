@@ -1,16 +1,19 @@
 import Cocoa
 import os.log
 
-private let shortcutLog = OSLog(subsystem: "com.zachlatta.freeflow", category: "Shortcuts")
+private let shortcutLog = OSLog(subsystem: "com.rushatpeace.onspeak", category: "Shortcuts")
 
 enum GlobalShortcutBackendError: LocalizedError {
+    case inputMonitoringPermissionRequired
     case eventTapUnavailable
     case eventTapRunLoopSourceUnavailable
 
     var errorDescription: String? {
         switch self {
+        case .inputMonitoringPermissionRequired:
+            return "Input Monitoring permission is required for global shortcuts. Enable \(AppName.displayName) in System Settings > Privacy & Security > Input Monitoring."
         case .eventTapUnavailable:
-            return "Global shortcut monitoring could not start. \(AppName.displayName) requires keyboard monitoring permission for global shortcuts."
+            return "Global shortcut monitoring could not start. Check Input Monitoring access for \(AppName.displayName)."
         case .eventTapRunLoopSourceUnavailable:
             return "Global shortcut monitoring could not start because the event tap run loop source could not be created."
         }
@@ -27,6 +30,9 @@ final class GlobalShortcutBackend {
 
     func start() throws {
         stop()
+        guard CGPreflightListenEventAccess() else {
+            throw GlobalShortcutBackendError.inputMonitoringPermissionRequired
+        }
         try installEventTap()
         fnKeyIsDown = ModifierKeyEventState.currentFunctionKeyIsDown()
     }

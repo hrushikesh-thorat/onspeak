@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let transcriptionLog = OSLog(subsystem: "com.zachlatta.freeflow", category: "Transcription")
+private let transcriptionLog = OSLog(subsystem: "com.rushatpeace.onspeak", category: "Transcription")
 
 class TranscriptionService {
     private static let modelsSupportingVerboseJSON: Set<String> = [

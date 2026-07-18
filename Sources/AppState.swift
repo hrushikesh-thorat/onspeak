@@ -4,10 +4,9 @@ import AppKit
 import AVFoundation
 import ServiceManagement
 import ApplicationServices
-import ScreenCaptureKit
 import Carbon
 import os.log
-private let recordingLog = OSLog(subsystem: "com.zachlatta.freeflow", category: "Recording")
+private let recordingLog = OSLog(subsystem: "com.rushatpeace.onspeak", category: "Recording")
 
 struct VoiceMacro: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
@@ -29,11 +28,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    static var visibleCases: [SettingsTab] {
-        allCases.filter { tab in
-            tab != .debug || AppBuild.isDevBundle
-        }
-    }
+    static var visibleCases: [SettingsTab] { [.general, .macros, .runLog] }
 
     var title: String {
         switch self {
@@ -58,7 +53,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
 enum AppBuild {
     static var isDevBundle: Bool {
-        (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String) == "FreeFlow Dev"
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String) == "OnSpeak Dev"
     }
 }
 
@@ -566,20 +561,18 @@ final class AppState: ObservableObject, @unchecked Sendable {
     @Published var selectedSettingsTab: SettingsTab? = .general
     @Published var pipelineHistory: [PipelineHistoryItem] = []
     @Published var debugStatusMessage = "Idle"
-    @Published var debugShowsUpdateReminderAfterDictation = false
     @Published var lastRawTranscript = ""
     @Published var lastPostProcessedTranscript = ""
     @Published var lastPostProcessingPrompt = ""
     @Published var lastContextSummary = ""
     @Published var lastPostProcessingStatus = ""
     @Published var lastContextScreenshotDataURL: String? = nil
-    @Published var lastContextScreenshotStatus = "No screenshot"
+    @Published var lastContextScreenshotStatus = ""
     @Published var lastContextAppName: String = ""
     @Published var lastContextBundleIdentifier: String = ""
     @Published var lastContextWindowTitle: String = ""
     @Published var lastContextSelectedText: String = ""
     @Published var lastContextLLMPrompt: String = ""
-    @Published var hasScreenRecordingPermission = false
     @Published var launchAtLogin: Bool {
         didSet { setLaunchAtLogin(launchAtLogin) }
     }
@@ -603,7 +596,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private var contextService: AppContextService
     private var contextCaptureTask: Task<AppContext?, Never>?
     private var capturedContext: AppContext?
-    private var hasShownScreenshotPermissionAlert = false
     private var audioDeviceObservers: [NSObjectProtocol] = []
     private var needsMicrophoneRefreshAfterRecording = false
     private let pipelineHistoryStore = PipelineHistoryStore()
@@ -614,7 +606,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private var pendingManualCommandInvocation = false
     private var pendingShortcutStartTask: Task<Void, Never>?
     private var pendingShortcutStartMode: RecordingTriggerMode?
-    private var realtimeService: RealtimeTranscriptionService?
+    private var nativeStreamingSession: SpeechAnalyzerStreamingSession?
     private var automaticTerminationDisabled = false
     private var activeAudioInterruption: ActiveAudioInterruption?
     private var pendingOverlayDismissToken: UUID?
@@ -624,7 +616,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private var pendingMicrophonePermissionTriggerMode: RecordingTriggerMode?
     private var pendingMicrophonePermissionSelectionSnapshot: AppSelectionSnapshot?
     private var pendingMicrophonePermissionManualCommandRequested: Bool?
-    private let postTranscriptionUpdateReminderDuration: TimeInterval = 7
 
     init() {
         UserDefaults.standard.removeObject(forKey: "force_http2_transcription")
@@ -712,7 +703,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         }
 
         let initialAccessibility = AXIsProcessTrusted()
-        let initialScreenCapturePermission = CGPreflightScreenCaptureAccess()
         var removedAudioFileNames: [String] = []
         do {
             removedAudioFileNames = try pipelineHistoryStore.trim(to: maxPipelineHistoryCount)
@@ -727,7 +717,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         let selectedMicrophoneID = UserDefaults.standard.string(forKey: selectedMicrophoneStorageKey) ?? "default"
 
         self.contextService = Self.makeAppContextService(
-            apiKey: apiKey,
+            apiKey: "",
             baseURL: apiBaseURL,
             customContextPrompt: customContextPrompt,
             contextModel: contextModel,
@@ -773,7 +763,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         self.voiceMacros = initialMacros
         self.pipelineHistory = savedHistory
         self.hasAccessibility = initialAccessibility
-        self.hasScreenRecordingPermission = initialScreenCapturePermission
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
         self.selectedMicrophoneID = selectedMicrophoneID
         self.precomputeMacros()
@@ -805,12 +794,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 self?.handleOverlayStopButtonPressed()
             }
         }
-        overlayManager.onUpdateOverlayPressed = { [weak self] in
-            DispatchQueue.main.async {
-                self?.handleUpdateOverlayPressed()
-            }
-        }
-
         // Clear any stale recording flag left over from an unclean exit.
         AppState.writeRecordingStateFlag(false)
     }
@@ -978,7 +961,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
 
     func makeAppContextService() -> AppContextService {
         Self.makeAppContextService(
-            apiKey: apiKey,
+            apiKey: "",
             baseURL: apiBaseURL,
             customContextPrompt: customContextPrompt,
             contextModel: contextModel,
@@ -1021,28 +1004,12 @@ final class AppState: ObservableObject, @unchecked Sendable {
         return normalized
     }
 
-    private var resolvedTranscriptionBaseURL: String {
-        let trimmed = transcriptionAPIURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? apiBaseURL : trimmed
-    }
-
-    private var resolvedTranscriptionAPIKey: String {
-        let trimmed = transcriptionAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? apiKey : trimmed
-    }
-
-    func makeTranscriptionService() throws -> TranscriptionService {
-        try TranscriptionService(
-            apiKey: resolvedTranscriptionAPIKey,
-            baseURL: resolvedTranscriptionBaseURL,
-            transcriptionModel: transcriptionModel,
-            language: resolvedTranscriptionLanguage
+    func transcribeAudioFile(_ fileURL: URL) async throws -> String {
+        try await SpeechAnalyzerService.transcribe(
+            fileURL: fileURL,
+            localePreference: transcriptionLanguage,
+            vocabulary: customVocabulary
         )
-    }
-
-    private var resolvedTranscriptionLanguage: String? {
-        let normalized = Self.normalizeTranscriptionLanguage(transcriptionLanguage)
-        return normalized.isEmpty ? nil : normalized
     }
 
     private func persistShortcut(_ binding: ShortcutBinding, key: String) {
@@ -1074,7 +1041,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         return audioDir
     }
 
-    /// URL of the flag file written while FreeFlow is actively recording.
+    /// URL of the flag file written while OnSpeak is actively recording.
     ///
     /// External tools (voice assistants, TTS barge-in pipelines, conversation
     /// apps) can poll this file to know when the user is dictating. The file
@@ -1082,18 +1049,18 @@ final class AppState: ObservableObject, @unchecked Sendable {
     /// Contents are the UNIX timestamp (seconds, float) of when recording
     /// started — useful for stale-flag detection after an unclean exit.
     ///
-    /// Path: `~/Library/Application Support/FreeFlow/is-recording`
-    /// (or `FreeFlow Dev/is-recording` when running the dev bundle).
+    /// Path: `~/Library/Application Support/OnSpeak/is-recording`
+    /// (or `OnSpeak Dev/is-recording` when running the dev bundle).
     static func recordingStateFlagURL() -> URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "FreeFlow"
+        let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "OnSpeak"
         return appSupport.appendingPathComponent("\(appName)/is-recording")
     }
 
     /// Serial queue that owns every flag-file I/O so the recording
     /// start/stop hot path never blocks on disk.
     private static let recordingStateFlagQueue = DispatchQueue(
-        label: "com.zachlatta.freeflow.recording-state-flag"
+        label: "com.rushatpeace.onspeak.recording-state-flag"
     )
 
     /// Write or clear the `is-recording` flag file. Called from the
@@ -1202,8 +1169,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
 
         Task {
             do {
-                let transcriptionService = try makeTranscriptionService()
-                let rawTranscript = try await transcriptionService.transcribe(fileURL: audioURL)
+                let rawTranscript = try await transcribeAudioFile(audioURL)
                 let parsedTranscript = Self.parseTranscriptCommands(
                     from: rawTranscript,
                     pressEnterCommandEnabled: self.isPressEnterVoiceCommandEnabled
@@ -1311,16 +1277,14 @@ final class AppState: ObservableObject, @unchecked Sendable {
         accessibilityTimer?.invalidate()
         accessibilityTimer = nil
         hasAccessibility = AXIsProcessTrusted()
-        hasScreenRecordingPermission = hasScreenCapturePermission()
-        if hasAccessibility && hasScreenRecordingPermission {
+        if hasAccessibility {
             return
         }
         accessibilityTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.hasAccessibility = AXIsProcessTrusted()
-                self.hasScreenRecordingPermission = self.hasScreenCapturePermission()
-                if self.hasAccessibility && self.hasScreenRecordingPermission {
+                if self.hasAccessibility {
                     self.accessibilityTimer?.invalidate()
                     self.accessibilityTimer = nil
                 }
@@ -1372,31 +1336,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 completion(false)
             }
         }
-    }
-
-    func hasScreenCapturePermission() -> Bool {
-        CGPreflightScreenCaptureAccess()
-    }
-
-    func requestScreenCapturePermission() {
-        // ScreenCaptureKit triggers the "Screen & System Audio Recording"
-        // permission dialog on macOS Sequoia+, correctly identifying the
-        // running app (unlike the legacy CGWindowListCreateImage path).
-        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { [weak self] _, _ in
-            DispatchQueue.main.async {
-                let granted = CGPreflightScreenCaptureAccess()
-                self?.hasScreenRecordingPermission = granted
-                if !granted {
-                    self?.openScreenCaptureSettings()
-                }
-            }
-        }
-
-        hasScreenRecordingPermission = CGPreflightScreenCaptureAccess()
-    }
-
-    func openScreenCaptureSettings() {
-        openPrivacySettingsPane("Privacy_ScreenCapture")
     }
 
     private func openPrivacySettingsPane(_ pane: String) {
@@ -1458,7 +1397,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
 
         audioDeviceObservers.append(
             notificationCenter.addObserver(
-                forName: .AVCaptureDeviceWasConnected,
+                forName: AVCaptureDevice.wasConnectedNotification,
                 object: nil,
                 queue: .main,
                 using: refreshOnAudioDeviceChange
@@ -1466,7 +1405,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         )
         audioDeviceObservers.append(
             notificationCenter.addObserver(
-                forName: .AVCaptureDeviceWasDisconnected,
+                forName: AVCaptureDevice.wasDisconnectedNotification,
                 object: nil,
                 queue: .main,
                 using: refreshOnAudioDeviceChange
@@ -1667,6 +1606,20 @@ final class AppState: ObservableObject, @unchecked Sendable {
         restartHotkeyMonitoring()
     }
 
+    var hasInputMonitoringPermission: Bool {
+        CGPreflightListenEventAccess()
+    }
+
+    @discardableResult
+    func requestInputMonitoringAccess() -> Bool {
+        CGRequestListenEventAccess()
+    }
+
+    func openInputMonitoringSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     func stopHotkeyMonitoring() {
         shouldMonitorHotkeys = false
         hotkeyMonitoringErrorMessage = nil
@@ -1810,7 +1763,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         debugStatusMessage = "Cancelled"
         statusText = "Cancelled"
         overlayManager.dismiss()
-        tearDownRealtimeService()
+        tearDownNativeStreamingSession()
         audioRecorder.cancelRecording()
         restoreAudioInterruptionIfNeeded()
         endCriticalDictationActivity()
@@ -2017,35 +1970,8 @@ final class AppState: ObservableObject, @unchecked Sendable {
             manualCommandRequested: manualCommandRequested
         ) else { return false }
 
-        if resolvedIntent.isCommandMode {
-            guard ensureScreenCaptureAccess() else { return false }
-            if let startedAt {
-                os_log(.info, log: recordingLog, "screen capture check passed: %.3fms", (CFAbsoluteTimeGetCurrent() - startedAt) * 1000)
-            }
-        } else {
-            hasScreenRecordingPermission = hasScreenCapturePermission()
-        }
-
         currentSessionIntent = resolvedIntent
         overlayManager.setRecordingTriggerMode(triggerMode, animated: false)
-        return true
-    }
-
-    private func ensureScreenCaptureAccess() -> Bool {
-        let granted = hasScreenCapturePermission()
-        hasScreenRecordingPermission = granted
-        guard granted else {
-            let message = "Screen recording permission not granted. Enable in System Settings > Privacy & Security > Screen Recording."
-            errorMessage = message
-            statusText = "Screenshot Required"
-            activeRecordingTriggerMode = nil
-            currentSessionIntent = .dictation
-            shortcutSessionController.reset()
-            playAlertSound(named: "Basso")
-            showScreenshotPermissionAlert(message: message)
-            return false
-        }
-
         return true
     }
 
@@ -2163,13 +2089,13 @@ final class AppState: ObservableObject, @unchecked Sendable {
 
     private func beginCriticalDictationActivity() {
         guard !automaticTerminationDisabled else { return }
-        ProcessInfo.processInfo.disableAutomaticTermination("FreeFlow dictation in progress")
+        ProcessInfo.processInfo.disableAutomaticTermination("OnSpeak dictation in progress")
         automaticTerminationDisabled = true
     }
 
     private func endCriticalDictationActivity() {
         guard automaticTerminationDisabled else { return }
-        ProcessInfo.processInfo.enableAutomaticTermination("FreeFlow dictation in progress")
+        ProcessInfo.processInfo.enableAutomaticTermination("OnSpeak dictation in progress")
         automaticTerminationDisabled = false
     }
 
@@ -2181,7 +2107,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
 
         isRecording = true
         statusText = "Starting..."
-        hasShownScreenshotPermissionAlert = false
 
         // Show initializing dots only if engine takes longer than 0.2s to start
         var overlayShown = false
@@ -2233,7 +2158,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
             }
         }
 
-        startRealtimeStreamingIfEnabled()
+        startNativeStreamingSession()
 
         // Start engine on background thread so UI isn't blocked
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -2270,7 +2195,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         contextCaptureTask?.cancel()
         contextCaptureTask = nil
         capturedContext = nil
-        tearDownRealtimeService()
+        tearDownNativeStreamingSession()
         audioRecorder.cleanup()
         restoreAudioInterruptionIfNeeded()
         isRecording = false
@@ -2466,6 +2391,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private enum TranscriptProcessingOutcome {
         case skippedEmptyRawTranscript
         case voiceMacro(command: String)
+        case basicCleanup
         case postProcessingSucceeded
         case postProcessingFailedFallback
         case preservedExactWording
@@ -2480,6 +2406,8 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 return "Skipped macros and post-processing for empty raw transcript"
             case .voiceMacro(let command):
                 return "Voice macro used: \(command)"
+            case .basicCleanup:
+                return "Basic on-device cleanup used"
             case .postProcessingSucceeded:
                 return isRetry ? "Post-processing succeeded (retried)" : "Post-processing succeeded"
             case .postProcessingFailedFallback:
@@ -2517,19 +2445,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
         }
 
         if case .command(let invocation, let selectedText) = intent {
-            do {
-                let result = try await postProcessingService.commandTransform(
-                    selectedText: selectedText,
-                    voiceCommand: rawTranscript,
-                    context: context,
-                    customVocabulary: customVocabulary,
-                    outputLanguage: outputLanguage
-                )
-                return (result.transcript, .commandModeSucceeded(invocation: invocation), result.prompt)
-            } catch {
-                os_log(.error, log: recordingLog, "Edit mode failed: %{public}@", error.localizedDescription)
-                return (selectedText, .commandModeFailedFallback(invocation: invocation), "")
-            }
+            // Edit Mode will be restored only after it has an on-device
+            // implementation. Never fall back to the inherited cloud path.
+            return (selectedText, .commandModeFailedFallback(invocation: invocation), "")
         }
 
         if let macro = findMatchingMacro(for: trimmedRawTranscript) {
@@ -2537,76 +2455,46 @@ final class AppState: ObservableObject, @unchecked Sendable {
             return (macro.payload, .voiceMacro(command: macro.command), "")
         }
 
-        // Preserve-exact-wording mode. Two sub-cases so translation
-        // stays honored:
-        //
-        //   1. No Output Language set — skip the LLM entirely and
-        //      return the raw transcript verbatim.
-        //   2. Output Language IS set — route through a stripped-down
-        //      translate-only prompt. The user asked for another
-        //      language; silently dropping translation defeats their
-        //      settings. The translate-only path preserves filler,
-        //      informal wording, and profanity 1:1 while still hitting
-        //      the target language.
         if preserveExactWording {
-            let targetLanguage = outputLanguage.trimmingCharacters(in: .whitespacesAndNewlines)
-            if targetLanguage.isEmpty {
-                return (trimmedRawTranscript, .preservedExactWording, "")
-            }
-            do {
-                let result = try await postProcessingService.translateVerbatim(
-                    transcript: trimmedRawTranscript,
-                    targetLanguage: targetLanguage
-                )
-                return (result.transcript, .preservedExactWordingTranslated, result.prompt)
-            } catch {
-                os_log(.error, log: recordingLog,
-                       "Verbatim translation failed: %{public}@",
-                       error.localizedDescription)
-                return (trimmedRawTranscript, .preservedExactWordingTranslationFailedFallback, "")
-            }
+            return (trimmedRawTranscript, .preservedExactWording, "")
         }
 
-        do {
-            let result = try await postProcessingService.postProcess(
-                transcript: trimmedRawTranscript,
-                context: context,
-                customVocabulary: customVocabulary,
-                customSystemPrompt: customSystemPrompt,
-                outputLanguage: outputLanguage
-            )
-            return (result.transcript, .postProcessingSucceeded, result.prompt)
-        } catch {
-            os_log(.error, log: recordingLog, "Post-processing failed: %{public}@", error.localizedDescription)
-            return (trimmedRawTranscript, .postProcessingFailedFallback, "")
-        }
+        // Fast local path: conservative filler, stutter, repetition and
+        // spacing cleanup. No inherited provider credentials are consulted.
+        let corrections = TranscriptTidier.CorrectionMapping.parse(customVocabulary)
+        return (TranscriptTidier.tidy(trimmedRawTranscript, corrections: corrections), .basicCleanup, "")
     }
 
-    /// Await the realtime WebSocket's final transcript. If it errors out (or
-    /// was never started) fall back to the file-based POST so the user still
-    /// gets a transcript. Runs the realtime commit and file upload in that
-    /// strict order to avoid paying for both when realtime succeeds.
-    private static func resolveRawTranscript(
-        realtimeService: RealtimeTranscriptionService?,
-        fileService: TranscriptionService,
+    /// Prefer the transcript streamed while the user was speaking. If the
+    /// streaming analyzer could not start or returned nothing, analyze the
+    /// recorded file locally as a reliable fallback.
+    private func resolveRawTranscript(
+        streamingSession: SpeechAnalyzerStreamingSession?,
         fileURL: URL
     ) async throws -> String {
-        if let realtimeService {
+        if let streamingSession {
             do {
                 try Task.checkCancellation()
-                return try await withTaskCancellationHandler {
-                    try await realtimeService.commitAndAwaitFinal()
+                let transcript = try await withTaskCancellationHandler {
+                    try await streamingSession.commitAndAwaitFinal()
                 } onCancel: {
-                    realtimeService.cancel()
+                    streamingSession.cancel()
                 }
+                if !transcript.isEmpty { return transcript }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 try Task.checkCancellation()
-                return try await fileService.transcribe(fileURL: fileURL)
+                os_log(
+                    .error,
+                    log: recordingLog,
+                    "streaming transcription failed, falling back to file: %{public}@",
+                    error.localizedDescription
+                )
+                streamingSession.cancel()
             }
         }
-        return try await fileService.transcribe(fileURL: fileURL)
+        return try await transcribeAudioFile(fileURL)
     }
 
     private func stopAndTranscribe() {
@@ -2631,7 +2519,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         lastPostProcessingStatus = ""
         lastPostProcessingPrompt = ""
         lastContextScreenshotDataURL = nil
-        lastContextScreenshotStatus = "No screenshot"
+        lastContextScreenshotStatus = ""
         isRecording = false
         restoreAudioInterruptionIfNeeded()
         isTranscribing = true
@@ -2653,7 +2541,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
             }
 
             guard self.isTranscribing else {
-                self.tearDownRealtimeService()
+                self.tearDownNativeStreamingSession()
                 self.audioRecorder.cleanup()
                 self.refreshAvailableMicrophonesIfNeeded()
                 return
@@ -2673,8 +2561,8 @@ final class AppState: ObservableObject, @unchecked Sendable {
             instructionExecutionGuardEnabled: instructionExecutionGuardEnabled
         )
 
-            let activeRealtime = self.realtimeService
-            self.realtimeService = nil
+            let activeStreamingSession = self.nativeStreamingSession
+            self.nativeStreamingSession = nil
             self.audioRecorder.onPCM16Samples = nil
             self.transcriptionTask?.cancel()
             guard self.isTranscribing else {
@@ -2682,7 +2570,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
                     Self.deleteAudioFile(savedAudioFile.fileName)
                 }
                 self.transcribingAudioFileName = nil
-                activeRealtime?.cancel()
+                activeStreamingSession?.cancel()
                 self.audioRecorder.cleanup()
                 self.endCriticalDictationActivity()
                 self.refreshAvailableMicrophonesIfNeeded()
@@ -2690,13 +2578,11 @@ final class AppState: ObservableObject, @unchecked Sendable {
             }
             self.transcriptionTask = Task {
                 defer {
-                    activeRealtime?.cancel()
+                    activeStreamingSession?.cancel()
                 }
                 do {
-                    let transcriptionService = try self.makeTranscriptionService()
-                    async let transcript = Self.resolveRawTranscript(
-                        realtimeService: activeRealtime,
-                        fileService: transcriptionService,
+                    async let transcript = self.resolveRawTranscript(
+                        streamingSession: activeStreamingSession,
                         fileURL: transcriptionFileURL
                     )
                     let rawTranscript = try await transcript
@@ -2743,8 +2629,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
                         guard self.isTranscribing else { return }
                         self.lastContextSummary = appContext.contextSummary
                         self.lastContextScreenshotDataURL = appContext.screenshotDataURL
-                        self.lastContextScreenshotStatus = appContext.screenshotError
-                            ?? "available (\(appContext.screenshotMimeType ?? "image"))"
+                        self.lastContextScreenshotStatus = ""
                         self.lastContextAppName = appContext.appName ?? ""
                         self.lastContextBundleIdentifier = appContext.bundleIdentifier ?? ""
                         self.lastContextWindowTitle = appContext.windowTitle ?? ""
@@ -2856,8 +2741,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
                         self.lastPostProcessingStatus = "Error: \(error.localizedDescription)"
                         self.lastPostProcessingPrompt = ""
                         self.lastContextScreenshotDataURL = resolvedContext.screenshotDataURL
-                        self.lastContextScreenshotStatus = resolvedContext.screenshotError
-                            ?? "available (\(resolvedContext.screenshotMimeType ?? "image"))"
+                        self.lastContextScreenshotStatus = ""
                         self.recordPipelineHistoryEntry(
                             rawTranscript: "",
                             postProcessedTranscript: "",
@@ -2905,8 +2789,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
             contextSystemPrompt: context.contextSystemPrompt,
             contextPrompt: context.contextPrompt,
             contextScreenshotDataURL: context.screenshotDataURL,
-            contextScreenshotStatus: context.screenshotError
-                ?? "available (\(context.screenshotMimeType ?? "image"))",
+            contextScreenshotStatus: "",
             postProcessingStatus: processingStatus,
             debugStatus: debugStatusMessage,
             customVocabulary: customVocabulary,
@@ -2926,37 +2809,22 @@ final class AppState: ObservableObject, @unchecked Sendable {
         }
     }
 
-    private func startRealtimeStreamingIfEnabled() {
-        guard realtimeStreamingEnabled else { return }
-        let trimmedBase = resolvedTranscriptionBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedBase.isEmpty else {
-            os_log(.info, log: recordingLog, "realtime streaming requested but base URL is empty — skipping")
-            return
-        }
-        let model = realtimeStreamingModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        let config = RealtimeTranscriptionService.Configuration(
-            baseURL: trimmedBase,
-            apiKey: resolvedTranscriptionAPIKey,
-            model: model,
-            language: resolvedTranscriptionLanguage
+    private func startNativeStreamingSession() {
+        let session = SpeechAnalyzerStreamingSession(
+            localePreference: transcriptionLanguage,
+            vocabulary: customVocabulary
         )
-        let service = RealtimeTranscriptionService(config: config)
-        do {
-            try service.start()
-        } catch {
-            os_log(.error, log: recordingLog, "failed to start realtime service: %{public}@", error.localizedDescription)
-            return
-        }
-        realtimeService = service
-        audioRecorder.onPCM16Samples = { [weak service] data in
-            service?.appendPCM16(data)
+        session.start()
+        nativeStreamingSession = session
+        audioRecorder.onPCM16Samples = { [weak session] data in
+            session?.appendPCM16(data)
         }
     }
 
-    private func tearDownRealtimeService() {
+    private func tearDownNativeStreamingSession() {
         audioRecorder.onPCM16Samples = nil
-        realtimeService?.cancel()
-        realtimeService = nil
+        nativeStreamingSession?.cancel()
+        nativeStreamingSession = nil
     }
 
     private func startContextCapture() {
@@ -2965,7 +2833,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         lastContextSummary = "Collecting app context..."
         lastPostProcessingStatus = ""
         lastContextScreenshotDataURL = nil
-        lastContextScreenshotStatus = "Collecting screenshot..."
+        lastContextScreenshotStatus = ""
 
         contextCaptureTask = Task { [weak self] in
             guard let self else { return nil }
@@ -2974,15 +2842,13 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 self.capturedContext = context
                 self.lastContextSummary = context.contextSummary
                 self.lastContextScreenshotDataURL = context.screenshotDataURL
-                self.lastContextScreenshotStatus = context.screenshotError
-                    ?? "available (\(context.screenshotMimeType ?? "image"))"
+                self.lastContextScreenshotStatus = ""
                 self.lastContextAppName = context.appName ?? ""
                 self.lastContextBundleIdentifier = context.bundleIdentifier ?? ""
                 self.lastContextWindowTitle = context.windowTitle ?? ""
                 self.lastContextSelectedText = context.selectedText ?? ""
                 self.lastContextLLMPrompt = context.contextPrompt ?? ""
                 self.lastPostProcessingStatus = "App context captured"
-                self.handleScreenshotCaptureIssue(context.screenshotError)
             }
             return context
         }
@@ -3001,7 +2867,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
             contextPrompt: nil,
             screenshotDataURL: nil,
             screenshotMimeType: nil,
-            screenshotError: "No app context captured before stop"
+            screenshotError: nil
         )
     }
 
@@ -3053,73 +2919,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private func handleScreenshotCaptureIssue(_ message: String?) {
-        guard let message, !message.isEmpty else {
-            hasShownScreenshotPermissionAlert = false
-            return
-        }
-
-        os_log(.error, "Screenshot capture issue: %{public}@", message)
-
-        if isScreenCapturePermissionError(message) && !hasShownScreenshotPermissionAlert {
-            hasScreenRecordingPermission = false
-            guard currentSessionIntent.isCommandMode else { return }
-            errorMessage = message
-            hasShownScreenshotPermissionAlert = true
-
-            // Permission errors are fatal — stop recording
-            tearDownRealtimeService()
-            audioRecorder.cancelRecording()
-            audioLevelCancellable?.cancel()
-            audioLevelCancellable = nil
-            contextCaptureTask?.cancel()
-            contextCaptureTask = nil
-            capturedContext = nil
-            isRecording = false
-            restoreAudioInterruptionIfNeeded()
-            shortcutSessionController.reset()
-            activeRecordingTriggerMode = nil
-            endCriticalDictationActivity()
-            statusText = "Screenshot Required"
-            overlayManager.dismiss()
-
-            playAlertSound(named: "Basso")
-            showScreenshotPermissionAlert(message: message)
-        }
-        // Non-permission errors (transient failures) — continue recording without context
-    }
-
-    private func isScreenCapturePermissionError(_ message: String) -> Bool {
-        let lowered = message.lowercased()
-        return lowered.contains("screen recording permission not granted")
-            || lowered.contains("requires screen recording permission")
-    }
-
-    private func showScreenshotPermissionAlert(message: String) {
-        let alert = NSAlert()
-        alert.messageText = "Screen Recording Permission Required"
-        alert.informativeText = "\(message)\n\n\(AppName.displayName) requires Screen Recording permission to capture screenshots for context-aware transcription.\n\nGo to System Settings > Privacy & Security > Screen Recording and enable \(AppName.displayName)."
-        alert.alertStyle = .critical
-        alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Dismiss")
-        alert.icon = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: nil)
-
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            openScreenCaptureSettings()
-        }
-    }
-
-    private func showScreenshotCaptureErrorAlert(message: String) {
-        let alert = NSAlert()
-        alert.messageText = "Screenshot Capture Failed"
-        alert.informativeText = "\(message)\n\nA screenshot is required for context-aware transcription. Recording has been stopped."
-        alert.alertStyle = .critical
-        alert.addButton(withTitle: "Dismiss")
-        alert.icon = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: nil)
-        _ = alert.runModal()
-    }
-
     func toggleDebugOverlay() {
         if isDebugOverlayActive {
             stopDebugOverlay()
@@ -3160,58 +2959,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
 
     @MainActor
     private func showPostTranscriptionUpdateReminderIfNeeded() -> Bool {
-        if debugShowsUpdateReminderAfterDictation {
-            showDebugUpdateAvailableOverlay()
-            return true
-        }
-
-        let updateManager = UpdateManager.shared
-        guard updateManager.shouldShowPostTranscriptionReminder() else { return false }
-
-        let dismissToken = UUID()
-        pendingOverlayDismissToken = dismissToken
-        updateManager.markPostTranscriptionReminderShown()
-        overlayManager.showUpdateAvailable(version: updateManager.latestReleaseVersion)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + postTranscriptionUpdateReminderDuration) { [weak self] in
-            guard let self, self.pendingOverlayDismissToken == dismissToken else { return }
-            self.pendingOverlayDismissToken = nil
-            self.overlayManager.dismiss()
-        }
-
-        return true
-    }
-
-    @MainActor
-    func showDebugUpdateAvailableOverlay() {
-        let updateManager = UpdateManager.shared
-        let version = updateManager.latestReleaseVersion.isEmpty ? "9.9.9" : updateManager.latestReleaseVersion
-        let dismissToken = UUID()
-        if isDebugOverlayActive || debugOverlayTimer != nil {
-            stopDebugOverlay()
-        }
-        pendingOverlayDismissToken = dismissToken
-        overlayManager.showUpdateAvailable(version: version)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + postTranscriptionUpdateReminderDuration) { [weak self] in
-            guard let self, self.pendingOverlayDismissToken == dismissToken else { return }
-            self.pendingOverlayDismissToken = nil
-            self.overlayManager.dismiss()
-        }
-    }
-
-    @MainActor
-    private func handleUpdateOverlayPressed() {
-        clearPendingOverlayDismissToken()
-        overlayManager.dismiss()
-        selectedSettingsTab = .general
-        NotificationCenter.default.post(name: .showSettings, object: nil)
-
-        DispatchQueue.main.async {
-            if UpdateManager.shared.updateAvailable {
-                UpdateManager.shared.showUpdateAlert()
-            }
-        }
+        false
     }
 
     private func scheduleOverlayDismissAfterFailureIndicator(after delay: TimeInterval) {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "OnSpeak Release"
+  short_description: "Prepare and publish OnSpeak semver releases."
+  default_prompt: "Prepare a new OnSpeak release."

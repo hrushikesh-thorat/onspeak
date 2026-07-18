@@ -1,13 +1,13 @@
 ---
-name: freeflow-release
-description: Prepare and publish FreeFlow app releases. Use when the user asks to release FreeFlow, prepare a new version, bump the FreeFlow version, write or update FreeFlow changelog entries, validate a FreeFlow semver release, create a vX.Y.Z tag, or publish a signed FreeFlow DMG through the repository GitHub Actions release workflow.
+name: onspeak-release
+description: Prepare and publish OnSpeak app releases. Use when the user asks to release OnSpeak, prepare a new version, bump the OnSpeak version, write or update OnSpeak changelog entries, validate an OnSpeak semver release, create a vX.Y.Z tag, or publish a signed OnSpeak DMG through the repository GitHub Actions release workflow.
 ---
 
-# FreeFlow Release
+# OnSpeak Release
 
 ## Overview
 
-Use this skill to prepare a FreeFlow release from the local repository. FreeFlow releases are semver-tag driven: pushing a tag like `v0.3.1` triggers `.github/workflows/release.yml`, which stamps the app bundle, extracts the matching `CHANGELOG.md` section, builds/signs/notarizes the DMG, and creates the GitHub Release.
+Use this skill to prepare an OnSpeak release from the local repository. OnSpeak releases are semver-tag driven: pushing a tag like `v0.3.1` triggers `.github/workflows/release.yml`, which stamps the app bundle, extracts the matching `CHANGELOG.md` section, builds/signs/notarizes the DMG, and creates the GitHub Release.
 
 Every release prep must update `CHANGELOG.md` by comparing the previous public semver release with the current release target. The changelog section should describe the user-visible changes that shipped since the previous release, not just summarize the final release-prep commit.
 
@@ -68,7 +68,7 @@ Every release prep must update `CHANGELOG.md` by comparing the previous public s
 5. Validate locally before commit/tag:
    ```bash
    .github/scripts/changelog-section.sh <version>
-   .agents/skills/freeflow-release/scripts/freeflow-release-check.sh <version>
+   .agents/skills/onspeak-release/scripts/onspeak-release-check.sh <version>
    git diff --check
    make clean
    make ARCH="$(uname -m)" CODESIGN_IDENTITY=-
@@ -90,10 +90,10 @@ Every release prep must update `CHANGELOG.md` by comparing the previous public s
 
 8. After GitHub Actions finishes, verify:
    - GitHub Release `v<version>` exists and is marked latest.
-   - `FreeFlow.dmg` is attached.
+   - `OnSpeak.dmg` is attached.
    - Release body starts with the matching `CHANGELOG.md` section.
    - A previous app version detects the update and shows What’s New.
 
 ## Helper Script
 
-Run `.agents/skills/freeflow-release/scripts/freeflow-release-check.sh <version>` from the FreeFlow repo root to check release preconditions. It validates semver shape, required files, changelog extraction, workflow trigger basics, and tag availability.
+Run `.agents/skills/onspeak-release/scripts/onspeak-release-check.sh <version>` from the OnSpeak repo root to check release preconditions. It validates semver shape, required files, changelog extraction, workflow trigger basics, and tag availability.

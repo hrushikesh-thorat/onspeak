@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://freeflow.zachlatta.com/sitemap.xml
+Sitemap: https://rushi-is-a.live/sitemap.xml

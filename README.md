@@ -1,114 +1,87 @@
 <p align="center">
-  <img src="Resources/AppIcon-Source.png" width="128" height="128" alt="FreeFlow icon">
+  <img src="Resources/AppIcon-Source.png" width="128" height="128" alt="OnSpeak icon">
 </p>
 
-<h1 align="center">FreeFlow</h1>
+<h1 align="center">OnSpeak</h1>
 
 <p align="center">
-  Free and open source alternative to <a href="https://wisprflow.ai">Wispr Flow</a>, <a href="https://superwhisper.com">Superwhisper</a>, and <a href="https://monologue.to">Monologue</a>.
-</p>
-
-<p align="center">
-  <a href="https://github.com/zachlatta/freeflow/releases/latest/download/FreeFlow.dmg"><b>⬇ Download FreeFlow.dmg</b></a><br>
-  <sub>Works on all Macs (Apple Silicon + Intel)</sub>
-</p>
-
----
-
-<p align="center">
-  <img src="Resources/demo.gif" alt="FreeFlow demo" width="600">
+  Clean, fast, on-device dictation for macOS.
 </p>
 
 <p align="center">
-  <i>Thank you to <a href="https://github.com/marcbodea">@marcbodea</a> for maintaining FreeFlow!</i>
+  <a href="https://rushi-is-a.live">Website</a>
 </p>
 
-## Overview
+## What OnSpeak does
 
-FreeFlow is a free Mac dictation app inspired by [Wispr Flow](https://wisprflow.ai/), [Superwhisper](https://superwhisper.com/), and [Monologue](https://www.monologue.to/). It gives you fast AI transcription, context-aware cleanup, and voice-driven text editing without a monthly subscription.
+Hold a shortcut, speak, and release. OnSpeak transcribes while you talk, performs a conservative local cleanup pass, and pastes the result at your cursor.
 
-## Quick Start
+The normal dictation path is deliberately small:
 
-1. Download the app from above or [click here](https://github.com/zachlatta/freeflow/releases/latest/download/FreeFlow.dmg)
-2. Get a free Groq API key from [groq.com](https://groq.com/)
-3. Hold `Fn` to talk, or tap `Command-Fn` to start and stop dictation, and have whatever you say pasted into the current text field
+```text
+Microphone → Apple SpeechAnalyzer → deterministic cleanup → clipboard/paste
+```
+
+There is no transcription account or API key. OnSpeak does not capture your screen and does not require Screen Recording permission.
+
+## Why Apple SpeechAnalyzer
+
+Apple's [SpeechAnalyzer documentation](https://developer.apple.com/documentation/speech/speechanalyzer) describes a native asynchronous pipeline for live or recorded audio, with `SpeechTranscriber` producing results and `AssetInventory` managing the required language assets. That maps directly to a lightweight Mac dictation app: audio can be streamed into the analyzer as it arrives, and the operating system manages the speech model.
+
+There is also encouraging independent evidence. [Inscribe's SpeechAnalyzer benchmark](https://get-inscribe.com/blog/apple-speech-api-benchmark.html), independently [covered by MacGeneration](https://www.macg.co/macos/2026/07/speechanalyzer-un-benchmark-confirme-que-la-transcription-dapple-bat-le-whisper-dopenai-309741), measured 5,559 LibriSpeech utterances fully on-device. It reported lower word error rates for SpeechAnalyzer than Whisper Small and roughly three-times-faster processing on the tested M2 Pro.
+
+That benchmark is useful evidence, not a universal guarantee: it covers English read speech on one machine, not every language, accent, microphone, or conversational environment.
 
 ## Features
 
-- **Custom shortcuts:** Customize both hold-to-talk and toggle dictation shortcuts. If your toggle shortcut extends your hold shortcut, you can start in hold mode and press the extra modifier keys to latch into tap mode without stopping the recording.
-- **Context-aware cleanup:** FreeFlow can read nearby app context so names, terms, and phrases are spelled correctly when you dictate into email, terminals, docs, and other apps.
-- **Custom vocabulary:** Add names, jargon, and project-specific words that FreeFlow should preserve during cleanup.
-- **OpenAI-compatible providers:** Use Groq by default, or configure a custom model and API URL in settings.
+- **On-device transcription:** Apple SpeechAnalyzer and SpeechTranscriber process dictation locally.
+- **Streaming results:** Audio is sent to the analyzer while you speak, reducing the work left after release.
+- **Hold or toggle shortcuts:** Configure separate hold-to-talk and tap-to-toggle shortcuts.
+- **Safe local cleanup:** Removes obvious fillers, repeated words, stutter fragments, extra whitespace, and punctuation spacing without semantic rewriting.
+- **Custom vocabulary:** Preserve names and technical terms, including explicit `spoken -> replacement` corrections.
+- **Paste again and history:** Quickly reuse recent dictation without recording it again.
+- **Microphone selection:** Choose a specific input or follow the system default.
+- **Native menu-bar UI:** OnSpeak stays out of the way until you need it.
 
-## Edit Mode
+## Privacy and permissions
 
-Edit Mode lets you highlight existing text and transform it with a spoken instruction, like "make this shorter" or "turn this into bullets." Enable it in settings, then use your normal dictation shortcut on selected text, or choose Manual mode to require an extra modifier key.
+OnSpeak's transcription and cleanup path runs on your Mac. Recorded audio and transcripts are not sent to an OnSpeak server.
 
-## Privacy
+The app requests only the permissions needed for dictation:
 
-There is no FreeFlow server, so FreeFlow does not store or retain your data. The only information that leaves your computer are API calls to your configured transcription and LLM provider.
+- **Microphone** to record your voice.
+- **Speech Recognition** to use Apple's speech framework.
+- **Accessibility** to observe the focused text target and paste the finished transcript.
+- **Input Monitoring** to detect your chosen global dictation shortcuts, including modifier-only shortcuts such as Fn or Right Option. OnSpeak does not record or store the keys you type.
 
-## Custom Cleanup
+OnSpeak does not request Screen Recording access and does not take screenshots.
 
-If you'd rather keep cleanup more literal and less context-aware, you can paste this simpler prompt into the custom system prompt setting:
+## Requirements
 
-<details>
-  <summary>Simple post-processing prompt</summary>
+- macOS 26 or later.
+- Hardware and language supported by Apple's `SpeechTranscriber`.
+- Xcode 26 and the macOS 26 SDK when building from source.
 
-  <pre><code>You are a dictation post-processor. You receive raw speech-to-text output and return clean text ready to be typed into an application.
+Speech assets for a selected language are downloaded and managed through Apple's `AssetInventory` when required.
 
-Your job:
-- Remove filler words (um, uh, you know, like) unless they carry meaning.
-- Fix spelling, grammar, and punctuation errors.
-- When the transcript already contains a word that is a close misspelling of a name or term from the context or custom vocabulary, correct the spelling. Never insert names or terms from context that the speaker did not say.
-- Preserve the speaker's intent, tone, and meaning exactly.
-
-Output rules:
-- Return ONLY the cleaned transcript text, nothing else. So NEVER output words like "Here is the cleaned transcript text:"
-- If the transcription is empty, return exactly: EMPTY
-- Do not add words, names, or content that are not in the transcription. The context is only for correcting spelling of words already spoken.
-- Do not change the meaning of what was said.
-
-Example:
-RAW_TRANSCRIPTION: "hey um so i just wanted to like follow up on the meating from yesterday i think we should definately move the dedline to next friday becuz the desine team still needs more time to finish the mock ups and um yeah let me know if that works for you ok thanks"
-
-Then your response would be ONLY the cleaned up text, so here your response is ONLY:
-"Hey, I just wanted to follow up on the meeting from yesterday. I think we should definitely move the deadline to next Friday because the design team still needs more time to finish the mockups. Let me know if that works for you. Thanks."</code></pre>
-</details>
-
-## Using a Local Model
-
-FreeFlow can use OpenAI-compatible local or self-hosted providers instead of Groq. In settings, configure the API base URL and model IDs for your local LLM provider, such as Ollama, LM Studio, or another OpenAI-compatible server. If your transcription backend uses a different endpoint from your LLM backend, set the transcription API URL separately.
-
-Local models are often slower than hosted providers, especially on cold start, long recordings, or busy hardware.
-
-<details>
-  <summary>Configure longer timeouts for local models</summary>
-
-  FreeFlow keeps the default network timeout at 20 seconds, but you can extend it with macOS defaults:
+## Build from source
 
 ```bash
-defaults write com.zachlatta.freeflow transcription_timeout_seconds -float 120
-defaults write com.zachlatta.freeflow post_processing_timeout_seconds -float 120
-defaults write com.zachlatta.freeflow context_request_timeout_seconds -float 120
+make
+make test
+make run
 ```
 
-The timeout keys are:
+The development bundle is built as `build/OnSpeak Dev.app` with bundle identifier `com.rushatpeace.onspeak.dev`.
 
-- `transcription_timeout_seconds`: audio transcription requests
-- `post_processing_timeout_seconds`: transcript cleanup and edit mode requests
-- `context_request_timeout_seconds`: nearby app context requests
+## Project principles
 
-Only positive values are used. Remove a custom timeout to return to the 20-second default:
-
-```bash
-defaults delete com.zachlatta.freeflow transcription_timeout_seconds
-defaults delete com.zachlatta.freeflow post_processing_timeout_seconds
-defaults delete com.zachlatta.freeflow context_request_timeout_seconds
-```
-
-</details>
+- Keep the primary workflow local and fast.
+- Prefer native platform APIs over bundled infrastructure.
+- Make cleanup predictable and meaning-preserving.
+- Request the fewest permissions possible.
+- Keep the interface understandable without documentation.
 
 ## License
 
-Licensed under the MIT license.
+OnSpeak is licensed under the MIT License. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for incorporated open-source components and their licenses.

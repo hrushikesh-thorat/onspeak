@@ -506,19 +506,6 @@ struct DebugSettingsView: View {
                     }
                 }
 
-                SettingsCard("Update Overlay", icon: "arrow.down.circle") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Display the update available overlay after dictation finishes.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Toggle("Show after dictation", isOn: $appState.debugShowsUpdateReminderAfterDictation)
-
-                        Button("Show Update Overlay Now") {
-                            appState.showDebugUpdateAvailableOverlay()
-                        }
-                    }
-                }
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -530,7 +517,6 @@ struct DebugSettingsView: View {
 
 struct GeneralSettingsView: View {
     @EnvironmentObject var appState: AppState
-    @Environment(\.openURL) private var openURL
     @AppStorage("show_menu_bar_icon") private var showMenuBarIcon = true
     @AppStorage("overlay_display_id") private var overlayDisplayID = 0
     @AppStorage("use_compact_overlay") private var useCompactOverlay = true
@@ -545,12 +531,10 @@ struct GeneralSettingsView: View {
     @State private var keyValidationSuccess = false
     @State private var customVocabularyInput: String = ""
     @State private var micPermissionGranted = false
+    @State private var inputMonitoringGranted = false
     @State private var showMutedHint = false
     @State private var copiedBuildInfo = false
     @State private var copiedBuildInfoResetWorkItem: DispatchWorkItem?
-    @StateObject private var githubCache = GitHubMetadataCache.shared
-    @ObservedObject private var updateManager = UpdateManager.shared
-    private let freeflowRepoURL = URL(string: "https://github.com/zachlatta/freeflow")!
 
     private var appDisplayName: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
@@ -563,7 +547,7 @@ struct GeneralSettingsView: View {
     }
 
     private var appBuildNumber: String {
-        Bundle.main.object(forInfoDictionaryKey: "FreeFlowBuildTag") as? String
+        Bundle.main.object(forInfoDictionaryKey: "OnSpeakBuildTag") as? String
             ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
             ?? "unknown"
     }
@@ -604,104 +588,6 @@ struct GeneralSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    // GitHub card
-                    VStack(spacing: 10) {
-                        HStack(spacing: 8) {
-                            AsyncImage(url: URL(string: "https://avatars.githubusercontent.com/u/992248")) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image.resizable().aspectRatio(contentMode: .fill)
-                                default:
-                                    Color.gray.opacity(0.2)
-                                }
-                            }
-                            .frame(width: 22, height: 22)
-                            .clipShape(Circle())
-
-                            Button {
-                                openURL(freeflowRepoURL)
-                            } label: {
-                                Text("zachlatta/freeflow")
-                                    .font(.system(.caption, design: .monospaced).weight(.medium))
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.blue)
-
-                            Spacer()
-
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(.yellow)
-                                    .font(.caption2)
-                                if githubCache.isLoading {
-                                    ProgressView().scaleEffect(0.5)
-                                } else if let count = githubCache.starCount {
-                                    Text("\(count.formatted()) \(count == 1 ? "star" : "stars")")
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(Color.yellow.opacity(0.14)))
-
-                            Button {
-                                openURL(freeflowRepoURL)
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "star")
-                                    Text("Star")
-                                }
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Capsule().fill(Color.yellow.opacity(0.18)))
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        if !githubCache.recentStargazers.isEmpty {
-                            Divider()
-                            HStack(spacing: 8) {
-                                HStack(spacing: -6) {
-                                    ForEach(githubCache.recentStargazers) { star in
-                                        Button {
-                                            openURL(star.user.htmlUrl)
-                                        } label: {
-                                            AsyncImage(url: star.user.avatarThumbnailUrl) { phase in
-                                                switch phase {
-                                                case .success(let image):
-                                                    image.resizable().aspectRatio(contentMode: .fill)
-                                                default:
-                                                    Color.gray.opacity(0.2)
-                                                }
-                                            }
-                                            .frame(width: 22, height: 22)
-                                            .clipShape(Circle())
-                                            .overlay(Circle().stroke(Color(nsColor: .windowBackgroundColor), lineWidth: 1.5))
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .clipped()
-                                Text("recently starred")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                                    .fixedSize()
-                                Spacer()
-                            }
-                            .clipped()
-                        }
-                    }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                            )
-                    )
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 4)
@@ -709,15 +595,6 @@ struct GeneralSettingsView: View {
 
                 SettingsCard("App", icon: "power") {
                     startupSection
-                }
-                SettingsCard("Updates", icon: "arrow.triangle.2.circlepath") {
-                    updatesSection
-                }
-                SettingsCard("API Key", icon: "key.fill") {
-                    apiKeySection
-                }
-                SettingsCard("Output Language", icon: "globe") {
-                    outputLanguageSection
                 }
                 SettingsCard("Dictation Shortcuts", icon: "keyboard.fill") {
                     hotkeySection
@@ -727,9 +604,6 @@ struct GeneralSettingsView: View {
                 }
                 SettingsCard("Recording Overlay", icon: "rectangle.dashed") {
                     overlaySection
-                }
-                SettingsCard("Edit Mode", icon: "pencil") {
-                    commandModeSection
                 }
                 SettingsCard("Cleanup", icon: "sparkles") {
                     cleanupSection
@@ -762,8 +636,8 @@ struct GeneralSettingsView: View {
             transcriptionAPIKeyInput = appState.transcriptionAPIKey
             customVocabularyInput = appState.customVocabulary
             checkMicPermission()
+            inputMonitoringGranted = appState.hasInputMonitoringPermission
             appState.refreshLaunchAtLoginStatus()
-            Task { await githubCache.fetchIfNeeded() }
         }
         .onChange(of: appState.transcriptionAPIURL) { value in
             if transcriptionAPIURLInput != value {
@@ -774,6 +648,10 @@ struct GeneralSettingsView: View {
             if transcriptionAPIKeyInput != value {
                 transcriptionAPIKeyInput = value
             }
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in
+            inputMonitoringGranted = appState.hasInputMonitoringPermission
+            checkMicPermission()
         }
     }
 
@@ -797,127 +675,6 @@ struct GeneralSettingsView: View {
                     }
                     .font(.caption)
                 }
-            }
-        }
-    }
-
-    // MARK: Updates
-
-    private var updatesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Toggle("Automatically check for updates", isOn: Binding(
-                get: { updateManager.autoCheckEnabled },
-                set: { updateManager.autoCheckEnabled = $0 }
-            ))
-
-            HStack(spacing: 10) {
-                Button {
-                    Task {
-                        await updateManager.checkForUpdates(userInitiated: true)
-                    }
-                } label: {
-                    if updateManager.isChecking {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Checking...")
-                        }
-                    } else {
-                        Text("Check for Updates Now")
-                    }
-                }
-                .disabled(updateManager.isChecking || updateManager.updateStatus != .idle)
-
-                if let lastCheck = updateManager.lastCheckDate {
-                    Text("Last checked: \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if updateManager.updateAvailable {
-                VStack(alignment: .leading, spacing: 8) {
-                    switch updateManager.updateStatus {
-                    case .downloading:
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.down.circle.fill")
-                                .foregroundStyle(.blue)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Downloading update...")
-                                    .font(.caption.weight(.semibold))
-                                ProgressView(value: updateManager.downloadProgress ?? 0)
-                                    .progressViewStyle(.linear)
-                                if let progress = updateManager.downloadProgress {
-                                    Text("\(Int(progress * 100))%")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Button("Cancel") {
-                                updateManager.cancelDownload()
-                            }
-                            .font(.caption)
-                        }
-
-                    case .installing:
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Installing update...")
-                                .font(.caption.weight(.semibold))
-                        }
-
-                    case .readyToRelaunch:
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Relaunching...")
-                                .font(.caption.weight(.semibold))
-                        }
-
-                    case .error(let message):
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
-                            Text(message)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                            Spacer()
-                            Button("Retry") {
-                                updateManager.updateStatus = .idle
-                                if let release = updateManager.latestRelease {
-                                    updateManager.downloadAndInstall(release: release)
-                                }
-                            }
-                            .font(.caption)
-                        }
-
-                    case .idle:
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.down.circle.fill")
-                                .foregroundStyle(.blue)
-                            Text(updateManager.latestReleaseVersion.isEmpty
-                                ? "A new version of \(AppName.displayName) is available!"
-                                : "\(AppName.displayName) v\(updateManager.latestReleaseVersion) is available!")
-                                .font(.caption.weight(.semibold))
-                            Spacer()
-                            Button("What's New") {
-                                updateManager.showReleaseNotes()
-                            }
-                            .font(.caption)
-                            Button("Update Now") {
-                                if let release = updateManager.latestRelease {
-                                    updateManager.downloadAndInstall(release: release)
-                                }
-                            }
-                            .font(.caption)
-                        }
-                    }
-                }
-                .padding(10)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(6)
             }
         }
     }
@@ -1076,7 +833,7 @@ struct GeneralSettingsView: View {
             }
             .pickerStyle(.menu)
 
-            Text("When set, FreeFlow translates your speech into the selected language.")
+            Text("When set, OnSpeak translates your speech into the selected language.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -1264,11 +1021,7 @@ struct GeneralSettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             Toggle("Preserve exact wording", isOn: $appState.preserveExactWording)
 
-            Text("When on, \(AppName.displayName) skips the LLM cleanup step and pastes the transcript verbatim — filler words, informal phrasing, and explicit language are all preserved. Voice macros and Edit Mode still run.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text("If Output Language is set, the transcript is still translated into that language, but the translation is literal: no rewording, no filler removal, no reformatting.")
+            Text("When on, \(AppName.displayName) skips local cleanup and pastes the transcript verbatim. Voice macros still run.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -1433,13 +1186,17 @@ struct GeneralSettingsView: View {
             )
 
             permissionRow(
-                title: "Screen Recording",
-                icon: "camera.viewfinder",
-                granted: appState.hasScreenRecordingPermission,
+                title: "Input Monitoring",
+                icon: "keyboard.fill",
+                granted: inputMonitoringGranted,
                 action: {
-                    appState.requestScreenCapturePermission()
+                    inputMonitoringGranted = appState.requestInputMonitoringAccess()
+                    if !inputMonitoringGranted {
+                        appState.openInputMonitoringSettings()
+                    }
                 }
             )
+
         }
     }
 
@@ -1733,7 +1490,7 @@ struct PromptsSettingsView: View {
             )
             .toggleStyle(.switch)
 
-            Text("When enabled, FreeFlow retries or falls back to the literal transcript if post-processing looks like it answered the dictated text instead of cleaning it.")
+            Text("When enabled, OnSpeak retries or falls back to the literal transcript if post-processing looks like it answered the dictated text instead of cleaning it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -1758,7 +1515,7 @@ struct PromptsSettingsView: View {
 
         let context = AppContext(
             appName: "\(AppName.displayName) Settings",
-            bundleIdentifier: "com.zachlatta.freeflow",
+            bundleIdentifier: "com.rushatpeace.onspeak",
             windowTitle: "System Prompt Test",
             selectedText: nil,
             currentActivity: "User is testing the system prompt in \(AppName.displayName) settings.",

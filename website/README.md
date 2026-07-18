@@ -1,6 +1,6 @@
-# freeflow.zachlatta.com
+# rushi-is-a.live
 
-Static landing page for FreeFlow.
+Static landing page for OnSpeak.
 
 ## Files
 
@@ -9,8 +9,8 @@ Static landing page for FreeFlow.
 - `assets/demo.gif` - product demo shown above the fold.
 - `llms.txt` - concise project summary for AI agents and answer engines.
 - `robots.txt` - crawler policy and sitemap pointer.
-- `sitemap.xml` - sitemap for `https://freeflow.zachlatta.com/`.
+- `sitemap.xml` - sitemap for `https://rushi-is-a.live/`.
 
 ## Deploy
 
-Serve this directory as the web root for `https://freeflow.zachlatta.com/`.
+Serve this directory as the web root for `https://rushi-is-a.live/`.

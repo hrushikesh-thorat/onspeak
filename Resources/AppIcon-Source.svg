@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OnSpeak app icon.
+  The waveform path is Lucide's audio-waveform icon, used under the ISC License.
+  See THIRD_PARTY_NOTICES.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="tileShadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000000" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#tileShadow)">
+    <rect x="48" y="48" width="928" height="928" rx="208" fill="#FFFFFF"/>
+  </g>
+  <rect x="52" y="52" width="920" height="920" rx="204" fill="none" stroke="#E5E7EB" stroke-width="8"/>
+
+  <!-- Lucide audio-waveform, viewBox 0 0 24 24, scaled by 30 and translated by 152. -->
+  <path
+    d="M212 542a60 60 0 0 0 60-60V362a60 60 0 0 1 120 0v390a60 60 0 0 0 120 0V272a60 60 0 0 1 120 0v390a60 60 0 0 0 120 0V542a60 60 0 0 1 60-60"
+    fill="none"
+    stroke="#000000"
+    stroke-width="60"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

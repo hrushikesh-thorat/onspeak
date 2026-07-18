@@ -1,12 +1,27 @@
 # Changelog
 
-All notable changes to FreeFlow are documented here.
+All notable changes to OnSpeak are documented here.
 
 This project uses semantic versioning for public releases. Use `MAJOR.MINOR.PATCH`, where:
 
 - `MAJOR` changes include breaking behavior or major compatibility changes.
 - `MINOR` changes add user-visible features and improvements.
 - `PATCH` changes fix bugs, polish existing behavior, or make small internal improvements.
+
+## [0.1.0] - 2026-07-18
+
+### Added
+
+- On-device dictation powered by Apple's SpeechAnalyzer, with streaming transcription while you speak and a recorded-audio fallback.
+- Hold-to-talk and tap-to-toggle global shortcuts, plus Paste Again and recent dictation history.
+- Deterministic local cleanup for fillers, obvious repetitions, stutter fragments, whitespace, and punctuation spacing.
+- Custom vocabulary, microphone selection, configurable recording feedback, clipboard preservation, and voice macros.
+- A native menu-bar interface and guided setup for Microphone, Speech Recognition, Accessibility, and Input Monitoring permissions.
+
+### Privacy
+
+- Audio transcription and cleanup run locally without a transcription account or API key.
+- OnSpeak does not capture the screen or request Screen Recording access.
 
 ## [1.2.0] - 2026-07-14
 
