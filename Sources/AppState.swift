@@ -51,12 +51,6 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     }
 }
 
-enum AppBuild {
-    static var isDevBundle: Bool {
-        (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String) == "OnSpeak Dev"
-    }
-}
-
 private struct PreservedPasteboardEntry {
     let type: NSPasteboard.PasteboardType
     let value: Value
@@ -1049,8 +1043,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
     /// Contents are the UNIX timestamp (seconds, float) of when recording
     /// started — useful for stale-flag detection after an unclean exit.
     ///
-    /// Path: `~/Library/Application Support/OnSpeak/is-recording`
-    /// (or `OnSpeak Dev/is-recording` when running the dev bundle).
+    /// Path: `~/Library/Application Support/OnSpeak/is-recording`.
     static func recordingStateFlagURL() -> URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "OnSpeak"

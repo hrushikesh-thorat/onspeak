@@ -1,5 +1,5 @@
-APP_NAME ?= OnSpeak Dev
-BUNDLE_ID ?= com.rushatpeace.onspeak.dev
+APP_NAME ?= OnSpeak
+BUNDLE_ID ?= com.rushatpeace.onspeak
 BUILD_DIR = build
 APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
 CODESIGN_IDENTITY ?= -
@@ -15,15 +15,8 @@ TEST_RUNNER = $(BUILD_DIR)/OnSpeakTests
 RESOURCES = $(CONTENTS)/Resources
 ARCH ?= $(shell uname -m)
 
-# Pick the generated icon asset for the current bundle. Both variants use the
-# same OnSpeak waveform mark so development builds exercise the shipping icon.
-ifeq ($(APP_NAME),OnSpeak Dev)
-ICON_SOURCE = Resources/AppIcon-Dev-Source.png
-ICON_ICNS = Resources/AppIcon-Dev.icns
-else
 ICON_SOURCE = Resources/AppIcon-Source.png
 ICON_ICNS = Resources/AppIcon.icns
-endif
 
 .PHONY: all clean run icon dmg codesign-dmg notarize test
 

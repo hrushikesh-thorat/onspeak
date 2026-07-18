@@ -36,6 +36,23 @@ jobs:
           plutil -replace CFBundleVersion -string "${{ github.run_number }}" Info.plist
           plutil -replace OnSpeakBuildTag -string "${{ steps.version.outputs.tag }}" Info.plist
 
+      - name: Detect signing configuration
+        id: signing
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          if [[ -n "$CERTIFICATE_BASE64" && -n "$CERTIFICATE_PASSWORD" && -n "$APPLE_ID" && -n "$APPLE_TEAM_ID" && -n "$APPLE_APP_PASSWORD" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "CODESIGN_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "Apple signing secrets are incomplete; publishing an ad-hoc signed build."
+          fi
+
       - name: Build release notes from changelog
         id: release_notes
         run: |
@@ -47,6 +64,16 @@ jobs:
             echo "## Download"
             echo
             echo "**[OnSpeak.dmg](https://github.com/hrushikesh-thorat/onspeak/releases/download/${{ steps.version.outputs.tag }}/OnSpeak.dmg)** — Universal build for macOS 26 (Apple Silicon + Intel)."
+            echo
+            echo "## Install"
+            echo
+            echo '```bash'
+            echo 'curl -L -o /tmp/OnSpeak.dmg https://github.com/hrushikesh-thorat/onspeak/releases/latest/download/OnSpeak.dmg && xattr -c /tmp/OnSpeak.dmg && hdiutil attach /tmp/OnSpeak.dmg -nobrowse -mountpoint /tmp/onspeak-dmg -quiet && rm -rf /Applications/OnSpeak.app && ditto /tmp/onspeak-dmg/OnSpeak.app /Applications/OnSpeak.app && hdiutil detach /tmp/onspeak-dmg -quiet && rm /tmp/OnSpeak.dmg && open /Applications/OnSpeak.app'
+            echo '```'
+            if [[ "${{ steps.signing.outputs.enabled }}" != "true" ]]; then
+              echo
+              echo "> This release is ad-hoc signed. The install command clears the downloaded quarantine attribute before installation."
+            fi
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -61,6 +88,7 @@ jobs:
       #   APPLE_TEAM_ID — 10-character Apple Team ID
       #   APPLE_APP_PASSWORD — app-specific password for notarization
       - name: Import Developer ID certificate
+        if: steps.signing.outputs.enabled == 'true'
         env:
           CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
@@ -100,6 +128,7 @@ jobs:
           echo "Found signing identity: $IDENTITY"
 
       - name: Store notarization credentials
+        if: steps.signing.outputs.enabled == 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -119,9 +148,11 @@ jobs:
         run: make dmg ARCH=universal APP_NAME=OnSpeak BUNDLE_ID=com.rushatpeace.onspeak CODESIGN_IDENTITY="$CODESIGN_IDENTITY"
 
       - name: Sign universal DMG
+        if: steps.signing.outputs.enabled == 'true'
         run: codesign --force --sign "$CODESIGN_IDENTITY" build/OnSpeak.dmg
 
       - name: Notarize universal DMG
+        if: steps.signing.outputs.enabled == 'true'
         run: |
           xcrun notarytool submit build/OnSpeak.dmg \
             --keychain-profile "notarytool-profile" \
