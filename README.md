@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://rushi-is-a.live">Website</a>
+  <a href="https://www.linkedin.com/in/hrushikeshth?utm_source=share_via&amp;utm_content=profile&amp;utm_medium=member_ios">LinkedIn</a>
 </p>
 
 ## Install
