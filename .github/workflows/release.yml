@@ -64,7 +64,7 @@ jobs:
             echo "## Install"
             echo
             echo '```bash'
-            echo 'curl -L -o /tmp/OnSpeak.dmg https://github.com/hrushikesh-thorat/onspeak/releases/latest/download/OnSpeak.dmg && xattr -c /tmp/OnSpeak.dmg && hdiutil attach /tmp/OnSpeak.dmg -nobrowse -mountpoint /tmp/onspeak-dmg -quiet && rm -rf /Applications/OnSpeak.app && ditto /tmp/onspeak-dmg/OnSpeak.app /Applications/OnSpeak.app && hdiutil detach /tmp/onspeak-dmg -quiet && rm /tmp/OnSpeak.dmg && open /Applications/OnSpeak.app'
+            echo 'curl -L -o /tmp/OnSpeak.dmg https://github.com/hrushikesh-thorat/OnSpeak/releases/latest/download/OnSpeak.dmg && xattr -c /tmp/OnSpeak.dmg && hdiutil attach /tmp/OnSpeak.dmg -nobrowse -mountpoint /tmp/onspeak-dmg -quiet && rm -rf /Applications/OnSpeak.app && ditto /tmp/onspeak-dmg/OnSpeak.app /Applications/OnSpeak.app && hdiutil detach /tmp/onspeak-dmg -quiet && rm /tmp/OnSpeak.dmg && open /Applications/OnSpeak.app'
             echo '```'
             if [[ "${{ steps.signing.outputs.enabled }}" != "true" ]]; then
               echo
