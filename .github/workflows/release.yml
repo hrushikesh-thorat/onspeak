@@ -61,10 +61,6 @@ jobs:
             echo "body<<EOF"
             cat "$RUNNER_TEMP/release-notes.md"
             echo
-            echo "## Download"
-            echo
-            echo "**[OnSpeak.dmg](https://github.com/hrushikesh-thorat/onspeak/releases/download/${{ steps.version.outputs.tag }}/OnSpeak.dmg)** — Universal build for macOS 26 (Apple Silicon + Intel)."
-            echo
             echo "## Install"
             echo
             echo '```bash'
