@@ -142,10 +142,10 @@ jobs:
 
       # --- Build universal ---
       - name: Build universal
-        run: make ARCH=universal APP_NAME=OnSpeak BUNDLE_ID=com.rushatpeace.onspeak CODESIGN_IDENTITY="$CODESIGN_IDENTITY"
+        run: make ARCH=universal APP_NAME=OnSpeak BUNDLE_ID=com.rushatpeace.onspeak BUILD_TAG="${{ steps.version.outputs.tag }}" CODESIGN_IDENTITY="$CODESIGN_IDENTITY"
 
       - name: Create universal DMG
-        run: make dmg ARCH=universal APP_NAME=OnSpeak BUNDLE_ID=com.rushatpeace.onspeak CODESIGN_IDENTITY="$CODESIGN_IDENTITY"
+        run: make dmg ARCH=universal APP_NAME=OnSpeak BUNDLE_ID=com.rushatpeace.onspeak BUILD_TAG="${{ steps.version.outputs.tag }}" CODESIGN_IDENTITY="$CODESIGN_IDENTITY"
 
       - name: Sign universal DMG
         if: steps.signing.outputs.enabled == 'true'
