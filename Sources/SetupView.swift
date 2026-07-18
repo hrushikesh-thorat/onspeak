@@ -57,9 +57,7 @@ struct SetupView: View {
         case welcome = 0
         case micPermission
         case accessibility
-        case inputMonitoring
         case holdShortcut
-        case toggleShortcut
         case copyAgainShortcut
         case vocabulary
         case launchAtLogin
@@ -71,7 +69,6 @@ struct SetupView: View {
     @State private var currentStep = SetupStep.welcome
     @State private var micPermissionGranted = false
     @State private var accessibilityGranted = false
-    @State private var inputMonitoringGranted = false
     @State private var apiKeyInput: String = ""
     @State private var apiBaseURLInput: String = ""
     @State private var transcriptionAPIURLInput: String = ""
@@ -80,7 +77,6 @@ struct SetupView: View {
     @State private var keyValidationError: String?
     @State private var showingProviderSettingsSheet = false
     @State private var accessibilityTimer: Timer?
-    @State private var inputMonitoringTimer: Timer?
     @State private var customVocabularyInput: String = ""
 
     // Test transcription state
@@ -95,17 +91,15 @@ struct SetupView: View {
     @State private var testAudioLevelCancellable: AnyCancellable? = nil
     @State private var testMicPulsing = false
     @State private var holdShortcutValidationMessage: String?
-    @State private var toggleShortcutValidationMessage: String?
     @State private var copyAgainShortcutValidationMessage: String?
     @State private var isCapturingHoldShortcut = false
-    @State private var isCapturingToggleShortcut = false
     @State private var isCapturingCopyAgainShortcut = false
     @StateObject private var testHotkeyHarness = SetupTestHotkeyHarness()
     @AppStorage("use_compact_overlay") private var useCompactOverlay = true
 
     private let totalSteps: [SetupStep] = SetupStep.allCases
     private var isCapturingShortcut: Bool {
-        isCapturingHoldShortcut || isCapturingToggleShortcut || isCapturingCopyAgainShortcut
+        isCapturingHoldShortcut || isCapturingCopyAgainShortcut
     }
 
     var body: some View {
@@ -192,11 +186,9 @@ struct SetupView: View {
             customVocabularyInput = appState.customVocabulary
             checkMicPermission()
             checkAccessibility()
-            checkInputMonitoring()
         }
         .onDisappear {
             accessibilityTimer?.invalidate()
-            inputMonitoringTimer?.invalidate()
             appState.resumeHotkeyMonitoringAfterShortcutCapture()
         }
         .sheet(isPresented: $showingProviderSettingsSheet) {
@@ -225,12 +217,8 @@ struct SetupView: View {
             micPermissionStep
         case .accessibility:
             accessibilityStep
-        case .inputMonitoring:
-            inputMonitoringStep
         case .holdShortcut:
             holdShortcutStep
-        case .toggleShortcut:
-            toggleShortcutStep
         case .copyAgainShortcut:
             copyAgainShortcutStep
         case .vocabulary:
@@ -259,7 +247,7 @@ struct SetupView: View {
                 Text("Welcome to \(AppName.displayName)")
                     .font(.system(size: 30, weight: .bold, design: .rounded))
 
-                Text("Dictate text anywhere on your Mac.\nHold to talk or tap to toggle dictation.")
+                Text("Dictate text anywhere on your Mac.\nHold Right Command to talk, then release to paste.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -445,50 +433,6 @@ struct SetupView: View {
         }
     }
 
-    var inputMonitoringStep: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "keyboard.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.blue)
-
-            Text("Input Monitoring")
-                .font(.title)
-                .fontWeight(.bold)
-
-            Text("\(AppName.displayName) needs Input Monitoring to detect your dictation shortcuts while you are using other apps. It does not record or store what you type.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack {
-                Image(systemName: "keyboard.fill")
-                    .frame(width: 24)
-                    .foregroundStyle(.blue)
-                Text("Input Monitoring")
-                Spacer()
-                if inputMonitoringGranted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text("Granted")
-                        .foregroundStyle(.green)
-                } else {
-                    Button("Grant Access") {
-                        requestInputMonitoring()
-                    }
-                }
-            }
-            .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(8)
-        }
-        .onAppear {
-            startInputMonitoringPolling()
-        }
-        .onDisappear {
-            inputMonitoringTimer?.invalidate()
-        }
-    }
-
     var holdShortcutStep: some View {
         VStack(spacing: 20) {
             Image(systemName: "keyboard.fill")
@@ -499,7 +443,7 @@ struct SetupView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("Choose the shortcut you want to hold while speaking.\nRelease it to stop unless you latch into tap mode later, or disable hold-to-talk entirely.")
+            Text("Choose the shortcut you want to hold while speaking.\nRelease it to stop, transcribe, and paste.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -514,49 +458,6 @@ struct SetupView: View {
                 }
             )
                 .padding(.top, 10)
-
-            if appState.holdShortcut.usesFnKey {
-                Text("Tip: If Fn opens Emoji picker, go to System Settings > Keyboard and change \"Press fn key to\" to \"Do Nothing\".")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .multilineTextAlignment(.center)
-            }
-
-        }
-    }
-
-    var toggleShortcutStep: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "switch.2")
-                .font(.system(size: 60))
-                .foregroundStyle(.blue)
-
-            Text("Tap to Toggle Shortcut")
-                .font(.title)
-                .fontWeight(.bold)
-
-            Text("Choose the shortcut you want to tap once to start dictating and tap again to stop.\nIf this shortcut becomes active while you are holding the hold shortcut, \(AppName.displayName) latches into tap mode. You can also disable tap-to-toggle entirely.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            ShortcutRoleSection(
-                role: .toggle,
-                selection: appState.toggleShortcut,
-                validationMessage: toggleShortcutValidationMessage,
-                isCapturing: $isCapturingToggleShortcut,
-                onSelect: { binding in
-                    toggleShortcutValidationMessage = appState.setShortcut(binding, for: .toggle)
-                }
-            )
-                .padding(.top, 10)
-
-            if appState.toggleShortcut.usesFnKey {
-                Text("Tip: If Fn opens Emoji picker, go to System Settings > Keyboard and change \"Press fn key to\" to \"Do Nothing\".")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .multilineTextAlignment(.center)
-            }
 
         }
     }
@@ -587,12 +488,6 @@ struct SetupView: View {
             )
                 .padding(.top, 10)
 
-            if appState.copyAgainShortcut.usesFnKey {
-                Text("Tip: If Fn opens Emoji picker, go to System Settings > Keyboard and change \"Press fn key to\" to \"Do Nothing\".")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .multilineTextAlignment(.center)
-            }
         }
     }
 
@@ -928,12 +823,6 @@ struct SetupView: View {
                 if appState.hasEnabledHoldShortcut {
                     HowToRow(icon: "keyboard", text: "Hold \(appState.holdShortcut.displayName) to record")
                 }
-                if appState.hasEnabledToggleShortcut {
-                    HowToRow(icon: "switch.2", text: "Tap \(appState.toggleShortcut.displayName) to start and stop")
-                }
-                if appState.hasEnabledHoldShortcut && appState.hasEnabledToggleShortcut {
-                    HowToRow(icon: "arrow.triangle.branch", text: "While holding, press the toggle shortcut to latch on")
-                }
                 if appState.isCommandModeEnabled {
                     switch appState.commandModeStyle {
                     case .automatic:
@@ -968,8 +857,6 @@ struct SetupView: View {
             return micPermissionGranted
         case .accessibility:
             return accessibilityGranted
-        case .inputMonitoring:
-            return inputMonitoringGranted
         case .testTranscription:
             return testPhase == .done && !testTranscript.isEmpty && testError == nil
         default:
@@ -978,16 +865,9 @@ struct SetupView: View {
     }
 
     private var testShortcutPrompt: String {
-        switch (appState.hasEnabledHoldShortcut, appState.hasEnabledToggleShortcut) {
-        case (true, true):
-            return "Hold \(appState.holdShortcut.displayName) or tap \(appState.toggleShortcut.displayName)"
-        case (true, false):
-            return "Hold \(appState.holdShortcut.displayName)"
-        case (false, true):
-            return "Tap \(appState.toggleShortcut.displayName)"
-        case (false, false):
-            return "Use Start Dictating from the menu bar"
-        }
+        appState.hasEnabledHoldShortcut
+            ? "Hold \(appState.holdShortcut.displayName)"
+            : "Use Start Dictating from the menu bar"
     }
 
     private var retryShortcutPrompt: String {
@@ -1081,26 +961,6 @@ struct SetupView: View {
 
     func requestAccessibility() {
         appState.openAccessibilitySettings()
-    }
-
-    func checkInputMonitoring() {
-        inputMonitoringGranted = appState.hasInputMonitoringPermission
-    }
-
-    func startInputMonitoringPolling() {
-        inputMonitoringTimer?.invalidate()
-        inputMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            DispatchQueue.main.async {
-                checkInputMonitoring()
-            }
-        }
-    }
-
-    func requestInputMonitoring() {
-        inputMonitoringGranted = appState.requestInputMonitoringAccess()
-        if !inputMonitoringGranted {
-            appState.openInputMonitoringSettings()
-        }
     }
 
     // MARK: - Test Transcription
@@ -1202,15 +1062,13 @@ struct SetupView: View {
                     }
                 }
 
-            case .switchedToToggle:
-                break
             }
         }
 
         do {
             try testHotkeyHarness.start(configuration: ShortcutConfiguration(
                 hold: appState.holdShortcut,
-                toggle: appState.toggleShortcut
+                copyAgain: appState.copyAgainShortcut
             ), startDelay: appState.shortcutStartDelay)
         } catch {
             testError = error.localizedDescription

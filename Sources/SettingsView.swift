@@ -531,7 +531,6 @@ struct GeneralSettingsView: View {
     @State private var keyValidationSuccess = false
     @State private var customVocabularyInput: String = ""
     @State private var micPermissionGranted = false
-    @State private var inputMonitoringGranted = false
     @State private var showMutedHint = false
     @State private var copiedBuildInfo = false
     @State private var copiedBuildInfoResetWorkItem: DispatchWorkItem?
@@ -636,7 +635,6 @@ struct GeneralSettingsView: View {
             transcriptionAPIKeyInput = appState.transcriptionAPIKey
             customVocabularyInput = appState.customVocabulary
             checkMicPermission()
-            inputMonitoringGranted = appState.hasInputMonitoringPermission
             appState.refreshLaunchAtLoginStatus()
         }
         .onChange(of: appState.transcriptionAPIURL) { value in
@@ -650,7 +648,6 @@ struct GeneralSettingsView: View {
             }
         }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in
-            inputMonitoringGranted = appState.hasInputMonitoringPermission
             checkMicPermission()
         }
     }
@@ -1185,18 +1182,6 @@ struct GeneralSettingsView: View {
                 }
             )
 
-            permissionRow(
-                title: "Input Monitoring",
-                icon: "keyboard.fill",
-                granted: inputMonitoringGranted,
-                action: {
-                    inputMonitoringGranted = appState.requestInputMonitoringAccess()
-                    if !inputMonitoringGranted {
-                        appState.openInputMonitoringSettings()
-                    }
-                }
-            )
-
         }
     }
 
@@ -1515,7 +1500,7 @@ struct PromptsSettingsView: View {
 
         let context = AppContext(
             appName: "\(AppName.displayName) Settings",
-            bundleIdentifier: "com.rushatpeace.onspeak",
+            bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.rushatpeace.onspeak",
             windowTitle: "System Prompt Test",
             selectedText: nil,
             currentActivity: "User is testing the system prompt in \(AppName.displayName) settings.",

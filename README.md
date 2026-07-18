@@ -44,7 +44,8 @@ That benchmark is useful evidence, not a universal guarantee: it covers English 
 
 - **On-device transcription:** Apple SpeechAnalyzer and SpeechTranscriber process dictation locally.
 - **Streaming results:** Audio is sent to the analyzer while you speak, reducing the work left after release.
-- **Hold or toggle shortcuts:** Configure separate hold-to-talk and tap-to-toggle shortcuts.
+- **Hold to talk:** Hold Right Command by default, then release to transcribe and paste.
+- **Paste Again:** Press Right Option by default to reuse the last transcript without recording.
 - **Safe local cleanup:** Removes obvious fillers, repeated words, stutter fragments, extra whitespace, and punctuation spacing without semantic rewriting.
 - **Custom vocabulary:** Preserve names and technical terms, including explicit `spoken -> replacement` corrections.
 - **Paste again and history:** Quickly reuse recent dictation without recording it again.
@@ -60,7 +61,8 @@ The app requests only the permissions needed for dictation:
 - **Microphone** to record your voice.
 - **Speech Recognition** to use Apple's speech framework.
 - **Accessibility** to observe the focused text target and paste the finished transcript.
-- **Input Monitoring** to detect your chosen global dictation shortcuts, including modifier-only shortcuts such as Fn or Right Option. OnSpeak does not record or store the keys you type.
+
+Global shortcuts use the existing Accessibility permission to observe modifier transitions only. OnSpeak does not request Input Monitoring and does not receive ordinary key presses.
 
 OnSpeak does not request Screen Recording access and does not take screenshots.
 

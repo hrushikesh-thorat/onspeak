@@ -9,7 +9,6 @@ struct DictationShortcutEditor: View {
 
     @State private var activeCaptureRole: ShortcutRole?
     @State private var holdValidationMessage: String?
-    @State private var toggleValidationMessage: String?
     @State private var copyAgainValidationMessage: String?
 
     init(showsIntroText: Bool = true, onCaptureStateChange: ((Bool) -> Void)? = nil) {
@@ -20,13 +19,13 @@ struct DictationShortcutEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if showsIntroText {
-                Text("Hold to record, tap to start and stop, and press the toggle shortcut while holding to latch into tap mode. You can disable either workflow or turn both shortcuts off.")
+                Text("Hold a shortcut while speaking, then release it to transcribe and paste. Paste Again reuses your last transcript without recording.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            if appState.holdShortcut.isDisabled && appState.toggleShortcut.isDisabled {
-                Label("Both dictation shortcuts are disabled.", systemImage: "exclamationmark.triangle.fill")
+            if appState.holdShortcut.isDisabled {
+                Label("Hold to Talk is disabled.", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -45,19 +44,6 @@ struct DictationShortcutEditor: View {
             )
 
             ShortcutRoleSection(
-                role: .toggle,
-                selection: appState.toggleShortcut,
-                validationMessage: toggleValidationMessage,
-                isCapturing: Binding(
-                    get: { activeCaptureRole == .toggle },
-                    set: { activeCaptureRole = $0 ? .toggle : nil }
-                ),
-                onSelect: { binding in
-                    toggleValidationMessage = appState.setShortcut(binding, for: .toggle)
-                }
-            )
-
-            ShortcutRoleSection(
                 role: .copyAgain,
                 selection: appState.copyAgainShortcut,
                 validationMessage: copyAgainValidationMessage,
@@ -70,15 +56,9 @@ struct DictationShortcutEditor: View {
                 }
             )
 
-            Text("Custom shortcuts can use regular keys, modifier-only shortcuts, or modifier combinations.")
+            Text("Custom shortcuts can use one or more modifier keys.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-            if appState.usesFnShortcut {
-                Text("Tip: If Fn opens the Emoji picker, go to System Settings > Keyboard and change \"Press fn key to\" to \"Do Nothing\".")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
         }
         .onChange(of: activeCaptureRole) { role in
             onCaptureStateChange?(role != nil)
@@ -278,18 +258,8 @@ private struct ShortcutCaptureRow: View {
                 return
             }
 
-            guard !ShortcutBinding.modifierKeyCodes.contains(event.keyCode) else {
-                return
-            }
-
-            guard let binding = ShortcutBinding.from(
-                event: event,
-                pressedModifierKeyCodes: captureInputState.pressedModifierKeyCodes
-            ) else {
-                return
-            }
-
-            currentBinding = binding
+            // Ordinary keys are used only to confirm or cancel capture. Global
+            // shortcuts intentionally observe modifier transitions only.
         }
         backend.start()
         captureBackend = backend
@@ -332,7 +302,7 @@ private struct ShortcutCaptureRow: View {
         if isCapturing {
             return currentBinding == nil ? "Recording shortcut…" : "Recorded shortcut"
         }
-        return savedBinding == nil ? "Record any key combo." : "Saved custom shortcut"
+        return savedBinding == nil ? "Record a modifier shortcut." : "Saved custom shortcut"
     }
 
     private var displayedBindingUsesMonospace: Bool {

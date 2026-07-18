@@ -94,29 +94,23 @@ struct MenuBarView: View {
 
             Divider()
 
-            // Manual toggle
             Button(appState.isRecording ? "Stop Recording" : "Start Dictating") {
-                appState.toggleRecording()
+                appState.handleManualRecordingButton()
             }
             .disabled(appState.isTranscribing)
 
             if let hotkeyError = appState.hotkeyMonitoringErrorMessage {
                 Divider()
-                Button {
-                    appState.openInputMonitoringSettings()
-                } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Label("Input Monitoring Required", systemImage: "keyboard.badge.ellipsis")
-                            .font(.caption.weight(.semibold))
-                        Text(hotkeyError)
-                            .font(.caption2)
-                            .lineLimit(3)
-                    }
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Label("Shortcut Unavailable", systemImage: "keyboard.badge.exclamationmark")
+                        .font(.caption.weight(.semibold))
+                    Text(hotkeyError)
+                        .font(.caption2)
+                        .lineLimit(3)
                 }
-                .buttonStyle(.plain)
+                .foregroundStyle(.red)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if let error = appState.errorMessage {
@@ -201,7 +195,7 @@ struct MenuBarView: View {
                             Text("  \(preset.title)")
                         }
                     }
-                    .disabled(preset.binding == appState.toggleShortcut)
+                    .disabled(preset.binding == appState.copyAgainShortcut)
                 }
 
                 if let savedCustomShortcut = appState.savedCustomShortcut(for: .hold) {
@@ -210,50 +204,6 @@ struct MenuBarView: View {
                         _ = appState.setShortcut(savedCustomShortcut, for: .hold)
                     } label: {
                         if appState.holdShortcut == savedCustomShortcut {
-                            Text("✓ Custom: \(savedCustomShortcut.displayName)")
-                        } else {
-                            Text("  Custom: \(savedCustomShortcut.displayName)")
-                        }
-                    }
-                }
-
-                Divider()
-                Button("Customize…") {
-                    appState.selectedSettingsTab = .general
-                    NotificationCenter.default.post(name: .showSettings, object: nil)
-                }
-            }
-
-            Menu("Toggle Shortcut") {
-                Button {
-                    _ = appState.setShortcut(.disabled, for: .toggle)
-                } label: {
-                    if appState.toggleShortcut.isDisabled {
-                        Text("✓ Disabled")
-                    } else {
-                        Text("  Disabled")
-                    }
-                }
-
-                ForEach(ShortcutPreset.allCases) { preset in
-                    Button {
-                        _ = appState.setShortcut(preset.binding, for: .toggle)
-                    } label: {
-                        if appState.toggleShortcut == preset.binding {
-                            Text("✓ \(preset.title)")
-                        } else {
-                            Text("  \(preset.title)")
-                        }
-                    }
-                    .disabled(preset.binding == appState.holdShortcut)
-                }
-
-                if let savedCustomShortcut = appState.savedCustomShortcut(for: .toggle) {
-                    Divider()
-                    Button {
-                        _ = appState.setShortcut(savedCustomShortcut, for: .toggle)
-                    } label: {
-                        if appState.toggleShortcut == savedCustomShortcut {
                             Text("✓ Custom: \(savedCustomShortcut.displayName)")
                         } else {
                             Text("  Custom: \(savedCustomShortcut.displayName)")
@@ -289,7 +239,7 @@ struct MenuBarView: View {
                             Text("  \(preset.title)")
                         }
                     }
-                    .disabled(preset.binding == appState.holdShortcut || preset.binding == appState.toggleShortcut)
+                    .disabled(preset.binding == appState.holdShortcut)
                 }
 
                 if let savedCustomShortcut = appState.savedCustomShortcut(for: .copyAgain) {

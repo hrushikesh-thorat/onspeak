@@ -124,7 +124,7 @@ final class RecordingOverlayManager {
     }
 
     private var overlayAcceptsMouseEvents: Bool {
-        (overlayState.phase == .recording && overlayState.recordingTriggerMode == .toggle)
+        (overlayState.phase == .recording && overlayState.recordingTriggerMode == .manual)
             || overlayState.phase == .updateAvailable
     }
 
@@ -428,14 +428,14 @@ final class RecordingOverlayManager {
         }
 
         let commandModeWidth: CGFloat = 180
-        let toggleWidth: CGFloat = 150
+        let manualWidth: CGFloat = 150
         let defaultWidth: CGFloat = 92
         let baseWidth: CGFloat
 
         if overlayState.isCommandMode {
             baseWidth = commandModeWidth
-        } else if overlayState.phase == .recording && overlayState.recordingTriggerMode == .toggle {
-            baseWidth = toggleWidth
+        } else if overlayState.phase == .recording && overlayState.recordingTriggerMode == .manual {
+            baseWidth = manualWidth
         } else {
             baseWidth = defaultWidth
         }
@@ -483,7 +483,7 @@ struct WingedRecordingView: View {
     }
 
     private var showsStopButton: Bool {
-        showsLiveRecordingContent && state.recordingTriggerMode == .toggle
+        showsLiveRecordingContent && state.recordingTriggerMode == .manual
     }
 
     var body: some View {
@@ -946,7 +946,7 @@ struct RecordingOverlayView: View {
     }
 
     private var showsStopButton: Bool {
-        showsLiveRecordingContent && state.recordingTriggerMode == .toggle
+        showsLiveRecordingContent && state.recordingTriggerMode == .manual
     }
 
     var body: some View {

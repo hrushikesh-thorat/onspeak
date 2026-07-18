@@ -26,7 +26,9 @@
     <string>OnSpeak needs microphone access to transcribe your speech on this Mac.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>OnSpeak uses on-device speech recognition to convert your voice to text.</string>
-    <key>NSAccessibilityUsageDescription</key>
-    <string>OnSpeak needs Accessibility access to paste transcribed text at your cursor.</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>OnSpeak needs Accessibility access to paste transcribed text at your cursor.</string>
+	<key>OnSpeakBuildTag</key>
+	<string>release</string>
 </dict>
 </plist>

@@ -8,6 +8,29 @@ This project uses semantic versioning for public releases. Use `MAJOR.MINOR.PATC
 - `MINOR` changes add user-visible features and improvements.
 - `PATCH` changes fix bugs, polish existing behavior, or make small internal improvements.
 
+## [0.2.0] - 2026-07-18
+
+### Added
+
+- A separate OnSpeak Dev build with its own app identity, preferences, and application-support data for safe local testing alongside the release app.
+- Regression coverage for the default modifier shortcuts and their press-and-release behavior.
+
+### Improved
+
+- Hold to Talk now defaults to Right Command, while Paste Again defaults to Right Option.
+- Global shortcut handling observes modifier transitions only through OnSpeak's existing Accessibility permission and excludes ordinary key presses.
+- Onboarding, settings, and the menu bar now focus on the two core actions: Hold to Talk and Paste Again.
+
+### Fixed
+
+- Right Command now starts recording reliably after Accessibility access is granted.
+- Obsolete toggle-shortcut preferences are removed during migration.
+
+### Removed
+
+- The Input Monitoring permission requirement, setup step, settings row, and menu-bar warning.
+- Tap to Toggle, including its shortcut, onboarding step, settings controls, menu items, and recording latch behavior.
+
 ## [0.1.0] - 2026-07-18
 
 ### Added

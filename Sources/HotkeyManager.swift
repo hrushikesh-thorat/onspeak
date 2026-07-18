@@ -1,15 +1,14 @@
-import Cocoa
+import Foundation
 
 final class HotkeyManager {
     private let backend = GlobalShortcutBackend()
     private var configuration = ShortcutConfiguration(
         hold: .defaultHold,
-        toggle: .defaultToggle
+        copyAgain: .defaultCopyAgain
     )
     private var inputState = ShortcutInputState()
 
     var onShortcutEvent: ((ShortcutEvent) -> Void)?
-    var onEscapeKeyPressed: (() -> Bool)?
 
     var currentPressedModifiers: ShortcutModifiers {
         inputState.currentModifiers
@@ -25,14 +24,10 @@ final class HotkeyManager {
         backend.onInputEvent = { [weak self] event in
             self?.handleInputEvent(event) ?? .passthrough
         }
-        backend.onEscapeKeyPressed = { [weak self] in
-            self?.onEscapeKeyPressed?() ?? false
-        }
         do {
             try backend.start()
         } catch {
             backend.onInputEvent = nil
-            backend.onEscapeKeyPressed = nil
             inputState = ShortcutInputState()
             throw error
         }
@@ -41,7 +36,6 @@ final class HotkeyManager {
     func stop() {
         backend.stop()
         backend.onInputEvent = nil
-        backend.onEscapeKeyPressed = nil
         inputState = ShortcutInputState()
     }
 

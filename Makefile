@@ -1,5 +1,8 @@
 APP_NAME ?= OnSpeak
 BUNDLE_ID ?= com.rushatpeace.onspeak
+BUILD_TAG ?= local
+DEV_APP_NAME = OnSpeak Dev
+DEV_BUNDLE_ID = com.rushatpeace.onspeak.dev
 BUILD_DIR = build
 APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
 CODESIGN_IDENTITY ?= -
@@ -18,7 +21,7 @@ ARCH ?= $(shell uname -m)
 ICON_SOURCE = Resources/AppIcon-Source.png
 ICON_ICNS = Resources/AppIcon.icns
 
-.PHONY: all clean run icon dmg codesign-dmg notarize test
+.PHONY: all clean run dev dev-run icon dmg codesign-dmg notarize test
 
 all: $(APP_EXECUTABLE_TARGET)
 
@@ -54,6 +57,7 @@ endif
 	@plutil -replace CFBundleDisplayName -string "$(APP_NAME)" "$(CONTENTS)/Info.plist"
 	@plutil -replace CFBundleExecutable -string "$(APP_NAME)" "$(CONTENTS)/Info.plist"
 	@plutil -replace CFBundleIdentifier -string "$(BUNDLE_ID)" "$(CONTENTS)/Info.plist"
+	@plutil -replace OnSpeakBuildTag -string "$(BUILD_TAG)" "$(CONTENTS)/Info.plist"
 	@cp $(ICON_ICNS) "$(RESOURCES)/AppIcon.icns"
 	@cp Resources/MenuBarIcon.svg "$(RESOURCES)/MenuBarIcon.svg"
 	@plutil -replace NSMicrophoneUsageDescription -string "$(APP_NAME) needs microphone access to transcribe your speech." "$(CONTENTS)/Info.plist"
@@ -65,14 +69,15 @@ endif
 test: $(TEST_RUNNER)
 	@$(TEST_RUNNER)
 
-$(TEST_RUNNER): Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Tests/AppContextServiceTests.swift Tests/TranscriptTidierTests.swift
+$(TEST_RUNNER): Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Tests/AppContextServiceTests.swift Tests/ShortcutTests.swift Tests/TranscriptTidierTests.swift
 	@mkdir -p "$(BUILD_DIR)"
 	swiftc \
 		-parse-as-library \
 		-o "$(TEST_RUNNER)" \
 		-sdk $(shell xcrun --show-sdk-path) \
 		-target $(ARCH)-apple-macosx26.0 \
-		Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Tests/AppContextServiceTests.swift Tests/TranscriptTidierTests.swift
+		Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Tests/AppContextServiceTests.swift Tests/TranscriptTidierTests.swift \
+		Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Tests/ShortcutTests.swift
 
 icon: $(ICON_ICNS)
 
@@ -118,3 +123,9 @@ clean:
 
 run: all
 	open "$(APP_BUNDLE)"
+
+dev:
+	@$(MAKE) APP_NAME="$(DEV_APP_NAME)" BUNDLE_ID="$(DEV_BUNDLE_ID)" BUILD_TAG=dev all
+
+dev-run: dev
+	open "$(BUILD_DIR)/$(DEV_APP_NAME).app"

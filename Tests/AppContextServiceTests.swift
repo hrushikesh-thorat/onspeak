@@ -9,6 +9,7 @@ struct AppContextServiceTests {
         testDeprecatedGroqModelsAreNotPredefined()
         testQwenCleanupDisablesReasoning()
         TranscriptTidierTests.run()
+        ShortcutTests.run()
         print("OnSpeakTests passed")
     }
 

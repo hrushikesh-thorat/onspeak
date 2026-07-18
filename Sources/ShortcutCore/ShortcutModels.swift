@@ -42,25 +42,23 @@ enum ShortcutBindingKind: String, Codable {
 
 enum RecordingTriggerMode: String, Codable {
     case hold
-    case toggle
+    case manual
 
     var badgeTitle: String {
         switch self {
         case .hold: return "Hold"
-        case .toggle: return "Tap"
+        case .manual: return "Manual"
         }
     }
 }
 
-enum ShortcutRole {
+enum ShortcutRole: Hashable {
     case hold
-    case toggle
     case copyAgain
 
     var title: String {
         switch self {
         case .hold: return "Hold to Talk"
-        case .toggle: return "Tap to Toggle"
         case .copyAgain: return "Paste Again"
         }
     }
@@ -69,42 +67,43 @@ enum ShortcutRole {
 enum ShortcutEvent: Equatable {
     case holdActivated
     case holdDeactivated
-    case toggleActivated
-    case toggleDeactivated
     case copyAgainTriggered
 }
 
 struct ShortcutConfiguration: Equatable {
     let hold: ShortcutBinding
-    let toggle: ShortcutBinding
     let copyAgain: ShortcutBinding
     let permittedAdditionalExactMatchModifiers: ShortcutModifiers
 
     init(
         hold: ShortcutBinding,
-        toggle: ShortcutBinding,
         copyAgain: ShortcutBinding = .disabled,
         permittedAdditionalExactMatchModifiers: ShortcutModifiers = []
     ) {
         self.hold = hold
-        self.toggle = toggle
         self.copyAgain = copyAgain
         self.permittedAdditionalExactMatchModifiers = permittedAdditionalExactMatchModifiers
     }
 
-    static let disabled = ShortcutConfiguration(hold: .disabled, toggle: .disabled, copyAgain: .disabled)
+    static let disabled = ShortcutConfiguration(hold: .disabled, copyAgain: .disabled)
 }
 
 enum ShortcutPreset: String, CaseIterable, Identifiable, Codable {
+    // Fn and F5 remain decodable for settings migration but are not offered in
+    // the streamlined two-shortcut interface.
     case fnKey = "fn"
+    case rightCommand = "rightCommand"
     case rightOption = "rightOption"
     case f5 = "f5"
+
+    static let allCases: [ShortcutPreset] = [.rightCommand, .rightOption]
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .fnKey: return "Fn 🌐"
+        case .rightCommand: return "Right Command ⌘"
         case .rightOption: return "Right Option ⌥"
         case .f5: return "F5"
         }
@@ -116,6 +115,14 @@ enum ShortcutPreset: String, CaseIterable, Identifiable, Codable {
             return ShortcutBinding(
                 keyCode: 63,
                 keyDisplay: "Fn",
+                modifiers: [],
+                kind: .modifierKey,
+                preset: self
+            )
+        case .rightCommand:
+            return ShortcutBinding(
+                keyCode: 54,
+                keyDisplay: "Right Command",
                 modifiers: [],
                 kind: .modifierKey,
                 preset: self
@@ -341,8 +348,8 @@ struct ShortcutBinding: Codable, Hashable, Identifiable, Equatable {
         kind: .disabled,
         preset: nil
     )
-    static let defaultHold = ShortcutPreset.fnKey.binding
-    static let defaultToggle = ShortcutPreset.fnKey.binding.withAddedModifiers(.command)
+    static let defaultHold = ShortcutPreset.rightCommand.binding
+    static let defaultCopyAgain = ShortcutPreset.rightOption.binding
 
     static let modifierKeyCodes: Set<UInt16> = [54, 55, 56, 58, 59, 60, 61, 62, 63]
 
