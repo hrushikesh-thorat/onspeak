@@ -84,6 +84,10 @@ make run
 
 The app bundle is built as `build/OnSpeak.app` with bundle identifier `com.rushatpeace.onspeak`.
 
+## Origin
+
+OnSpeak was forked from [zachlatta/freeflow](https://github.com/zachlatta/freeflow) at commit [`1de2c2fec50cfa24bf988b670a7598138914a05f`](https://github.com/zachlatta/freeflow/commit/1de2c2fec50cfa24bf988b670a7598138914a05f).
+
 ## Project principles
 
 - Keep the primary workflow local and fast.
