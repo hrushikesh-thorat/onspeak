@@ -3,8 +3,8 @@ import Foundation
 /// Fast, deterministic cleanup for literal speech transcripts.
 ///
 /// This deliberately handles only transformations that are unlikely to alter
-/// meaning. Semantic rewrites and self-corrections belong to the smart cleanup
-/// provider, not this type.
+/// meaning. Semantic rewrites and self-corrections belong to the dynamic
+/// cleanup provider, not this type.
 struct TranscriptTidier {
     struct CorrectionMapping: Equatable {
         let spoken: String

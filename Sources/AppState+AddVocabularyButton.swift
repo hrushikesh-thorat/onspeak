@@ -4,8 +4,12 @@ import AppKit
 
 @MainActor
 extension AppState {
-    /// Pastes a word (or words) from the macOS pasteboard into the user's custom vocabulary.
-    /// Returns the pasted text if successful, or nil otherwise.
+    /// Adds a word (or words) from the macOS pasteboard to the personal
+    /// dictionary as active manual entries. Returns the added text on success,
+    /// or nil when there was nothing to add — empty pasteboard, or every word is
+    /// already an active dictionary entry. The nil case is the existing
+    /// "already added" feedback path: the menu-bar checkmark only flashes on a
+    /// non-nil result.
     @discardableResult
     func pasteWordToVocabulary() -> String? {
         // Read text from pasteboard (macOS native clipboard API)
@@ -14,44 +18,34 @@ extension AppState {
               !pastedString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
         }
-        
+
         // Clean and prepare the new word(s)
         let wordsToAdd = pastedString
             .split(whereSeparator: { $0 == "\n" || $0 == "," || $0 == ";" })
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-            
+
         guard !wordsToAdd.isEmpty else { return nil }
-        
-        // Parse current vocabulary list to avoid adding exact duplicates
-        let currentWordsList = self.customVocabulary
-            .split(whereSeparator: { $0 == "\n" || $0 == "," || $0 == ";" })
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            
-        let currentWordsSet = Set(currentWordsList.map { $0.lowercased() })
-        
-        let newUniqueWords = wordsToAdd.filter { !currentWordsSet.contains($0.lowercased()) }
-        
-        guard !newUniqueWords.isEmpty else { return nil }
-        
-        let newWordsString = newUniqueWords.joined(separator: ", ")
-        
-        // Append unique words to existing vocabulary
-        // We trim the block as a whole to safely append, but not the individual words themselves
-        var currentVocab = self.customVocabulary.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !currentVocab.isEmpty {
-            if !currentVocab.hasSuffix(",") {
-                currentVocab += ","
+
+        // Route each word to the personal dictionary. `addManual` folds case and
+        // diacritics for dedup and throws `.duplicateTerm` only when the term is
+        // already active — the same "nothing new" outcome the old free-form
+        // append produced, mapped to the nil return (no checkmark).
+        let store = DictionaryStore.shared
+        var addedWords: [String] = []
+        for word in wordsToAdd {
+            do {
+                let entry = try store.addManual(term: word)
+                addedWords.append(entry.term)
+            } catch DictionaryStoreError.duplicateTerm {
+                continue
+            } catch {
+                continue
             }
-            currentVocab += "\n\(newWordsString)"
-        } else {
-            currentVocab = newWordsString
         }
-        
-        // Save back to the published state
-        self.customVocabulary = currentVocab
-        return newWordsString
+
+        guard !addedWords.isEmpty else { return nil }
+        return addedWords.joined(separator: ", ")
     }
 }
 

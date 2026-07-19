@@ -1,7 +1,7 @@
 APP_NAME ?= OnSpeak
 BUNDLE_ID ?= com.rushatpeace.onspeak
 BUILD_TAG ?= local
-DEV_APP_NAME = OnSpeak Dev
+DEV_APP_NAME = onspeak-dev
 DEV_BUNDLE_ID = com.rushatpeace.onspeak.dev
 BUILD_DIR = build
 APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
@@ -15,13 +15,19 @@ APP_EXECUTABLE_TARGET := $(subst $(space),\ ,$(APP_EXECUTABLE))
 
 SOURCES = $(shell find Sources -name '*.swift' -type f | LC_ALL=C sort)
 TEST_RUNNER = $(BUILD_DIR)/OnSpeakTests
+EVAL_RUNNER = $(BUILD_DIR)/OnSpeakDynamicCleanupEval
+# The eval mirrors production: each spoken input passes through the
+# deterministic TranscriptTidier.tidy before reaching the model, so the tidier
+# source is compiled into the eval runner. It compiles standalone (the `make
+# test` runner already builds it that way), so no extra dependencies are pulled.
+EVAL_SOURCES = $(shell find Sources/DynamicCleanup -name '*.swift' -type f | LC_ALL=C sort) Sources/TranscriptTidier.swift
 RESOURCES = $(CONTENTS)/Resources
 ARCH ?= $(shell uname -m)
 
 ICON_SOURCE = Resources/AppIcon-Source.png
 ICON_ICNS = Resources/AppIcon.icns
 
-.PHONY: all clean run dev dev-run icon dmg codesign-dmg notarize test
+.PHONY: all clean run dev dev-run icon dmg codesign-dmg notarize test eval
 
 all: $(APP_EXECUTABLE_TARGET)
 
@@ -69,7 +75,7 @@ endif
 test: $(TEST_RUNNER)
 	@$(TEST_RUNNER)
 
-$(TEST_RUNNER): Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Tests/AppContextServiceTests.swift Tests/ShortcutTests.swift Tests/TranscriptTidierTests.swift
+$(TEST_RUNNER): Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Sources/DynamicCleanup/DynamicCleanupGuard.swift Sources/Dictionary/DictionaryTermLearner.swift Sources/Dictionary/DictionaryStore.swift Tests/AppContextServiceTests.swift Tests/ShortcutTests.swift Tests/TranscriptTidierTests.swift Tests/DynamicCleanupGuardTests.swift Tests/DictionaryTermLearnerTests.swift Tests/DictionaryStoreTests.swift
 	@mkdir -p "$(BUILD_DIR)"
 	swiftc \
 		-parse-as-library \
@@ -77,7 +83,26 @@ $(TEST_RUNNER): Sources/AppContextService.swift Sources/LLMAPITransport.swift So
 		-sdk $(shell xcrun --show-sdk-path) \
 		-target $(ARCH)-apple-macosx26.0 \
 		Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Tests/AppContextServiceTests.swift Tests/TranscriptTidierTests.swift \
-		Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Tests/ShortcutTests.swift
+		Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Tests/ShortcutTests.swift \
+		Sources/DynamicCleanup/DynamicCleanupGuard.swift Tests/DynamicCleanupGuardTests.swift \
+		Sources/Dictionary/DictionaryTermLearner.swift Sources/Dictionary/DictionaryStore.swift Tests/DictionaryTermLearnerTests.swift Tests/DictionaryStoreTests.swift
+
+# Manual golden-case eval for the on-device dynamic-cleanup post-processor
+# (spec 001, "Testing" section). A tuning tool, not a CI gate: it runs real
+# transcripts through Apple's on-device Foundation Models and prints a
+# pass/diff table. Requires macOS 26 with Apple Intelligence enabled; when
+# unavailable the runner explains why and exits 0.
+eval: $(EVAL_RUNNER)
+	@$(EVAL_RUNNER)
+
+$(EVAL_RUNNER): $(EVAL_SOURCES) Tests/DynamicCleanupEval.swift
+	@mkdir -p "$(BUILD_DIR)"
+	swiftc \
+		-parse-as-library \
+		-o "$(EVAL_RUNNER)" \
+		-sdk $(shell xcrun --show-sdk-path) \
+		-target $(ARCH)-apple-macosx26.0 \
+		$(EVAL_SOURCES) Tests/DynamicCleanupEval.swift
 
 icon: $(ICON_ICNS)
 
@@ -124,8 +149,17 @@ clean:
 run: all
 	open "$(APP_BUNDLE)"
 
+DEV_BUILD_TAG = dev-$(shell git rev-parse --short HEAD 2>/dev/null || echo nogit)$(shell git diff --quiet 2>/dev/null || echo -dirty)-$(shell date +%Y%m%d.%H%M)
+
+# Dev signing: macOS ties the Accessibility grant to the app's code signature,
+# and an ad-hoc signature changes on every rebuild, so the grant would need
+# re-approval each build. A persistent self-signed "onspeak-dev-signing"
+# code-signing certificate (create once in Keychain Access) keeps the identity
+# stable across rebuilds; when absent, fall back to ad-hoc.
+DEV_CODESIGN_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | grep -q "onspeak-dev-signing" && echo onspeak-dev-signing || echo -)
+
 dev:
-	@$(MAKE) APP_NAME="$(DEV_APP_NAME)" BUNDLE_ID="$(DEV_BUNDLE_ID)" BUILD_TAG=dev all
+	@$(MAKE) APP_NAME="$(DEV_APP_NAME)" BUNDLE_ID="$(DEV_BUNDLE_ID)" BUILD_TAG="$(DEV_BUILD_TAG)" CODESIGN_IDENTITY="$(DEV_CODESIGN_IDENTITY)" all
 
 dev-run: dev
 	open "$(BUILD_DIR)/$(DEV_APP_NAME).app"

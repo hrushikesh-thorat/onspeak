@@ -915,7 +915,13 @@ struct SetupView: View {
     }
 
     func saveCustomVocabularyAndContinue() {
-        appState.customVocabulary = customVocabularyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let vocabulary = customVocabularyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The legacy string stays the home of `spoken -> replacement`
+        // corrections; plain terms additionally land in the personal
+        // dictionary, which migration won't revisit (its one-time flag was
+        // already set at first launch, before setup collected anything).
+        appState.customVocabulary = vocabulary
+        DictionaryStore.shared.importPlainTerms(fromLegacyText: vocabulary)
         withAnimation {
             currentStep = nextStep(currentStep)
         }
