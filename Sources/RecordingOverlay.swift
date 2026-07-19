@@ -1,5 +1,11 @@
 import SwiftUI
 import AppKit
+import os.log
+
+private let recordingOverlayLog = OSLog(
+    subsystem: "com.rushatpeace.onspeak",
+    category: "RecordingOverlay"
+)
 
 // MARK: - State
 
@@ -11,6 +17,7 @@ final class RecordingOverlayState: ObservableObject {
     @Published var updateVersion: String = ""
     @Published var errorMessage: String?
     @Published var toastID: UUID?
+    @Published var liveTranscript: String = ""
 }
 
 enum OverlayPhase {
@@ -76,6 +83,17 @@ final class RecordingOverlayManager {
     private var overlayWindow: NSPanel?
     private let overlayState = RecordingOverlayState()
     private var lockedOverlayWidth: CGFloat?
+    private var hasExpandedForLiveTranscript = false
+    private var liveTranscriptSessionGate = LiveTranscriptSessionGate()
+    private var didLogFirstPanelForActiveSession = false
+    private var didLogFirstPreviewApplicationForActiveSession = false
+
+    var activeRecordingSessionID: UUID? {
+        liveTranscriptSessionGate.activeSessionID
+    }
+
+    fileprivate static let liveTranscriptStripHeight: CGFloat = 28
+    private static let maximumLiveTranscriptWidth: CGFloat = 420
 
     var onStopButtonPressed: (() -> Void)?
     var onUpdateOverlayPressed: (() -> Void)?
@@ -128,9 +146,45 @@ final class RecordingOverlayManager {
             || overlayState.phase == .updateAvailable
     }
 
+    /// Establishes the overlay boundary for one real recording attempt before
+    /// any asynchronous preflight or analyzer work begins. The session is
+    /// installed synchronously on the main thread so matching preview results
+    /// can be retained immediately, even if AppKit has not produced a panel.
+    func beginRecordingSession(
+        id: UUID,
+        mode: RecordingTriggerMode,
+        isCommandMode: Bool
+    ) {
+        beginRecordingSession(
+            context: LiveTranscriptSessionContext(id: id),
+            mode: mode,
+            isCommandMode: isCommandMode
+        )
+    }
+
+    /// Context-based form used by real recordings so overlay milestone timing
+    /// shares the shortcut-acceptance clock with capture and transcription.
+    func beginRecordingSession(
+        context: LiveTranscriptSessionContext,
+        mode: RecordingTriggerMode,
+        isCommandMode: Bool
+    ) {
+        performOnMainSynchronously {
+            self.lockedOverlayWidth = nil
+            self.clearLiveTranscriptSession()
+            self.liveTranscriptSessionGate.begin(context)
+            self.overlayState.recordingTriggerMode = mode
+            self.overlayState.isCommandMode = isCommandMode
+            self.overlayState.phase = .initializing
+            self.overlayState.audioLevel = 0
+            self.showOverlayPanel(animatedResize: false)
+        }
+    }
+
     func showInitializing(mode: RecordingTriggerMode = .hold, isCommandMode: Bool = false) {
         DispatchQueue.main.async {
             self.lockedOverlayWidth = nil
+            self.clearLiveTranscriptSession()
             self.overlayState.recordingTriggerMode = mode
             self.overlayState.isCommandMode = isCommandMode
             self.overlayState.phase = .initializing
@@ -142,6 +196,7 @@ final class RecordingOverlayManager {
     func showRecording(mode: RecordingTriggerMode = .hold, isCommandMode: Bool = false) {
         DispatchQueue.main.async {
             self.lockedOverlayWidth = nil
+            self.clearLiveTranscriptSession()
             self.overlayState.recordingTriggerMode = mode
             self.overlayState.isCommandMode = isCommandMode
             self.overlayState.phase = .recording
@@ -170,6 +225,33 @@ final class RecordingOverlayManager {
     func updateAudioLevel(_ level: Float) {
         DispatchQueue.main.async {
             self.overlayState.audioLevel = level
+        }
+    }
+
+    func updateLiveTranscript(_ text: String, sessionID: UUID) {
+        DispatchQueue.main.async {
+            // Check identity when the queued UI work executes, not when it is
+            // submitted. A dismissal or replacement that wins the race makes
+            // an already-queued delivery stale.
+            guard self.liveTranscriptSessionGate.accepts(sessionID: sessionID) else {
+                return
+            }
+            switch self.overlayState.phase {
+            case .initializing, .recording, .transcribing:
+                break
+            case .feedback, .updateAvailable:
+                return
+            }
+
+            self.overlayState.liveTranscript = text
+            guard !text.isEmpty, !self.hasExpandedForLiveTranscript else { return }
+
+            self.hasExpandedForLiveTranscript = true
+            if self.overlayState.phase == .transcribing, let screen = self.targetScreen {
+                self.lockedOverlayWidth = self.liveTranscriptWidth(on: screen)
+            }
+            self.updateOverlayLayout(animated: true)
+            self.logFirstPreviewApplicationIfNeeded()
         }
     }
 
@@ -204,6 +286,7 @@ final class RecordingOverlayManager {
         }()
         DispatchQueue.main.async {
             let toastID = UUID()
+            self.clearLiveTranscriptSession()
             self.overlayState.errorMessage = truncated
             self.overlayState.toastID = toastID
             self.lockedOverlayWidth = nil
@@ -226,6 +309,7 @@ final class RecordingOverlayManager {
     func showUpdateAvailable(version: String) {
         DispatchQueue.main.async {
             self.lockedOverlayWidth = nil
+            self.clearLiveTranscriptSession()
             self.overlayState.isCommandMode = false
             self.overlayState.updateVersion = version
             self.overlayState.phase = .updateAvailable
@@ -234,7 +318,7 @@ final class RecordingOverlayManager {
     }
 
     func dismiss() {
-        DispatchQueue.main.async {
+        performOnMainSynchronously {
             self.dismissAll()
         }
     }
@@ -248,6 +332,8 @@ final class RecordingOverlayManager {
             resize(panel: panel, to: frame, animated: animatedResize)
             panel.alphaValue = 1
             panel.orderFrontRegardless()
+            logFirstPanelOrderedIfNeeded()
+            logFirstPreviewApplicationIfNeeded()
             return
         }
 
@@ -270,6 +356,8 @@ final class RecordingOverlayManager {
         }
 
         overlayWindow = panel
+        logFirstPanelOrderedIfNeeded()
+        logFirstPreviewApplicationIfNeeded()
     }
 
     private func updateOverlayLayout(animated: Bool) {
@@ -281,7 +369,11 @@ final class RecordingOverlayManager {
     }
 
     private func setTranscribingPhase() {
-        lockedOverlayWidth = overlayWindow?.frame.width ?? overlayWidth
+        if hasExpandedForLiveTranscript, let screen = targetScreen {
+            lockedOverlayWidth = liveTranscriptWidth(on: screen)
+        } else {
+            lockedOverlayWidth = overlayWindow?.frame.width ?? overlayWidth
+        }
         overlayState.phase = .transcribing
         showOverlayPanel(animatedResize: true)
     }
@@ -294,7 +386,8 @@ final class RecordingOverlayManager {
                 leftWingWidth: Self.leftWingWidth,
                 notchWidth: notchWidth,
                 rightWingWidth: Self.rightWingWidth,
-                height: frame.height,
+                wingsRowHeight: notchOverlap,
+                showsLiveTranscript: hasExpandedForLiveTranscript,
                 onStopButtonPressed: { [weak self] in
                     self?.onStopButtonPressed?()
                 }
@@ -314,6 +407,13 @@ final class RecordingOverlayManager {
             rootView: AnyView(
                 RecordingOverlayView(
                     state: overlayState,
+                    contentRowHeight: max(
+                        0,
+                        frame.height
+                            - (screenHasNotch ? notchOverlap : 0)
+                            - (hasExpandedForLiveTranscript ? Self.liveTranscriptStripHeight : 0)
+                    ),
+                    showsLiveTranscript: hasExpandedForLiveTranscript,
                     onStopButtonPressed: { [weak self] in
                         self?.onStopButtonPressed?()
                     },
@@ -367,15 +467,26 @@ final class RecordingOverlayManager {
 
         if useWingedLayout {
             // Anchor to the screen's auxiliary-area boundaries of the notch;
-            // panel height matches the menu-bar overlap so nothing protrudes below.
+            // when the preview is expanded, center the wider panel on the
+            // physical notch so the fixed-width spacer remains aligned.
             let nWidth = notchWidth
             let nLeftX = screen.auxiliaryTopLeftArea?.maxX
                 ?? (screen.frame.midX - nWidth / 2)
             let leftWing = Self.leftWingWidth
             let rightWing = Self.rightWingWidth
+            let baseWidth = leftWing + nWidth + rightWing
             let panelHeight = notchOverlap
-            let panelWidth = leftWing + nWidth + rightWing
-            let panelX = nLeftX - leftWing
+                + (hasExpandedForLiveTranscript ? Self.liveTranscriptStripHeight : 0)
+            let panelWidth: CGFloat
+            if overlayState.phase == .transcribing, let lockedOverlayWidth {
+                panelWidth = lockedOverlayWidth
+            } else if hasExpandedForLiveTranscript {
+                panelWidth = liveTranscriptWidth(on: screen)
+            } else {
+                panelWidth = baseWidth
+            }
+            let notchCenterX = nLeftX + nWidth / 2
+            let panelX = notchCenterX - panelWidth / 2
             let panelY = screen.frame.maxY - panelHeight
             return NSRect(x: panelX, y: panelY, width: panelWidth, height: panelHeight)
         }
@@ -390,9 +501,11 @@ final class RecordingOverlayManager {
         // 38pt drop-down pill remains available when use_compact_overlay
         // is explicitly toggled off. Error toasts also force the drop-down
         // height so messages stay readable even when compact overlay is enabled.
-        let height: CGFloat = (useCompact && !forceDropDownPill)
+        let baseHeight: CGFloat = (useCompact && !forceDropDownPill)
             ? notchOverlap
             : 38 + (screenHasNotch ? notchOverlap : 0)
+        let height = baseHeight
+            + (hasExpandedForLiveTranscript ? Self.liveTranscriptStripHeight : 0)
         let x = screen.frame.midX - width / 2
         let y = screen.frame.maxY - height
         return NSRect(x: x, y: y, width: width, height: height)
@@ -427,6 +540,10 @@ final class RecordingOverlayManager {
             return max(notchWidth, updateWidth)
         }
 
+        if hasExpandedForLiveTranscript, let screen = targetScreen {
+            return liveTranscriptWidth(on: screen)
+        }
+
         let commandModeWidth: CGFloat = 180
         let manualWidth: CGFloat = 150
         let defaultWidth: CGFloat = 92
@@ -446,12 +563,14 @@ final class RecordingOverlayManager {
 
     private func showFeedbackPanel() {
         lockedOverlayWidth = nil
+        clearLiveTranscriptSession()
         overlayState.phase = .feedback
         showOverlayPanel(animatedResize: true)
     }
 
     private func dismissAll() {
         lockedOverlayWidth = nil
+        clearLiveTranscriptSession()
         overlayState.isCommandMode = false
         overlayState.updateVersion = ""
         if let panel = overlayWindow {
@@ -462,6 +581,63 @@ final class RecordingOverlayManager {
             panel.contentView = nil
             panel.close()
             overlayWindow = nil
+        }
+    }
+
+    private func liveTranscriptWidth(on screen: NSScreen) -> CGFloat {
+        min(Self.maximumLiveTranscriptWidth, screen.visibleFrame.width - 40)
+    }
+
+    private func clearLiveTranscriptSession() {
+        liveTranscriptSessionGate.invalidate()
+        didLogFirstPanelForActiveSession = false
+        didLogFirstPreviewApplicationForActiveSession = false
+        resetLiveTranscriptPresentation()
+    }
+
+    private func resetLiveTranscriptPresentation() {
+        overlayState.liveTranscript = ""
+        hasExpandedForLiveTranscript = false
+    }
+
+    private func logFirstPanelOrderedIfNeeded() {
+        guard !didLogFirstPanelForActiveSession,
+              let context = liveTranscriptSessionGate.activeContext else {
+            return
+        }
+        didLogFirstPanelForActiveSession = true
+        os_log(
+            .info,
+            log: recordingOverlayLog,
+            "session %{public}@ initializing panel ordered front at %{public}d ms",
+            context.id.uuidString,
+            context.elapsedMilliseconds()
+        )
+    }
+
+    private func logFirstPreviewApplicationIfNeeded() {
+        guard !didLogFirstPreviewApplicationForActiveSession,
+              overlayWindow != nil,
+              hasExpandedForLiveTranscript,
+              !overlayState.liveTranscript.isEmpty,
+              let context = liveTranscriptSessionGate.activeContext else {
+            return
+        }
+        didLogFirstPreviewApplicationForActiveSession = true
+        os_log(
+            .info,
+            log: recordingOverlayLog,
+            "session %{public}@ first preview row applied at %{public}d ms",
+            context.id.uuidString,
+            context.elapsedMilliseconds()
+        )
+    }
+
+    private func performOnMainSynchronously(_ work: () -> Void) {
+        if Thread.isMainThread {
+            work()
+        } else {
+            DispatchQueue.main.sync(execute: work)
         }
     }
 }
@@ -475,7 +651,8 @@ struct WingedRecordingView: View {
     let leftWingWidth: CGFloat
     let notchWidth: CGFloat
     let rightWingWidth: CGFloat
-    let height: CGFloat
+    let wingsRowHeight: CGFloat
+    let showsLiveTranscript: Bool
     let onStopButtonPressed: () -> Void
 
     private var showsLiveRecordingContent: Bool {
@@ -487,8 +664,16 @@ struct WingedRecordingView: View {
     }
 
     var body: some View {
-        wingsHStack
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 0) {
+            wingsHStack
+                .frame(maxWidth: .infinity)
+                .frame(height: wingsRowHeight)
+
+            if showsLiveTranscript {
+                LiveTranscriptStrip(text: state.liveTranscript)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .animation(.spring(response: 0.28, dampingFraction: 1.0), value: state.phase)
     }
 
@@ -529,11 +714,11 @@ struct WingedRecordingView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(width: leftWingWidth, height: height)
+            .frame(width: leftWingWidth, height: wingsRowHeight)
 
             // Notch spacer — solid black; camera cutout hides it.
             Color.black
-                .frame(width: notchWidth, height: height)
+                .frame(width: notchWidth, height: wingsRowHeight)
 
             // Right wing — stop button (recording) OR failure X (feedback),
             // horizontally centered.
@@ -561,10 +746,67 @@ struct WingedRecordingView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(width: rightWingWidth, height: height)
+            .frame(width: rightWingWidth, height: wingsRowHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.spring(response: 0.28, dampingFraction: 1.0), value: state.phase)
+    }
+}
+
+// MARK: - Live Transcript Preview
+
+/// A display-only, tail-following row shared by both overlay layouts. The
+/// text keeps its intrinsic width and is clipped instead of truncated, which
+/// avoids an ellipsis glyph while keeping the newest words pinned to the
+/// logical trailing edge. The fade marks the clipped logical leading edge.
+struct LiveTranscriptStrip: View {
+    @Environment(\.layoutDirection) private var layoutDirection
+    let text: String
+
+    private var trailingAlignment: Alignment {
+        layoutDirection == .leftToRight ? .trailing : .leading
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .regular))
+            .foregroundStyle(.white.opacity(0.85))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(maxWidth: .infinity, alignment: trailingAlignment)
+            .frame(height: 22)
+            .clipped()
+            .mask(leadingEdgeFade)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity)
+            .frame(height: RecordingOverlayManager.liveTranscriptStripHeight)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var leadingEdgeFade: some View {
+        if layoutDirection == .leftToRight {
+            HStack(spacing: 0) {
+                LinearGradient(
+                    colors: [.clear, .white],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 10)
+                Color.white
+            }
+        } else {
+            HStack(spacing: 0) {
+                Color.white
+                LinearGradient(
+                    colors: [.white, .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 10)
+            }
+        }
     }
 }
 
@@ -935,6 +1177,8 @@ struct InitializingDotsView: View {
 
 struct RecordingOverlayView: View {
     @ObservedObject var state: RecordingOverlayState
+    let contentRowHeight: CGFloat
+    let showsLiveTranscript: Bool
     let onStopButtonPressed: () -> Void
     let onUpdateOverlayPressed: () -> Void
 
@@ -953,59 +1197,69 @@ struct RecordingOverlayView: View {
         Group {
             if state.phase == .feedback, let message = state.errorMessage {
                 ErrorOverlayView(message: message)
+                    .padding(.horizontal, 12)
             } else if state.phase == .feedback {
                 FailureIndicatorView()
+                    .padding(.horizontal, 12)
             } else if state.phase == .updateAvailable {
                 UpdateAvailableOverlayView(onPress: onUpdateOverlayPressed)
+                    .padding(.horizontal, 12)
             } else {
-                ZStack {
-                    Group {
-                        if state.phase == .initializing {
-                            InitializingDotsView()
-                                .transition(.opacity)
-                        } else if showsLiveRecordingContent {
-                            WaveformView(
-                                audioLevel: state.audioLevel,
-                                showsActivityPulse: state.phase == .recording
-                            )
-                                .transition(.opacity)
-                        } else {
-                            ProcessingIndicatorView()
-                                .transition(.opacity)
-                        }
-                    }
-
-                    HStack {
+                VStack(spacing: 0) {
+                    ZStack {
                         Group {
-                            if state.isCommandMode {
-                                CommandModeIndicator()
+                            if state.phase == .initializing {
+                                InitializingDotsView()
+                                    .transition(.opacity)
+                            } else if showsLiveRecordingContent {
+                                WaveformView(
+                                    audioLevel: state.audioLevel,
+                                    showsActivityPulse: state.phase == .recording
+                                )
+                                    .transition(.opacity)
+                            } else {
+                                ProcessingIndicatorView()
                                     .transition(.opacity)
                             }
                         }
-                        .frame(width: leadingAccessoryWidth, alignment: .center)
-                        .frame(maxHeight: .infinity, alignment: .center)
 
-                        Spacer(minLength: 0)
-
-                        Group {
-                            if showsStopButton {
-                                Button(action: onStopButtonPressed) {
-                                    Image(systemName: "stop.fill")
-                                        .font(.system(size: 7, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 14, height: 14)
-                                        .background(Circle().fill(Color.red.opacity(0.92)))
+                        HStack {
+                            Group {
+                                if state.isCommandMode {
+                                    CommandModeIndicator()
+                                        .transition(.opacity)
                                 }
-                                .buttonStyle(.plain)
-                                .transition(.move(edge: .trailing).combined(with: .opacity))
                             }
+                            .frame(width: leadingAccessoryWidth, alignment: .center)
+                            .frame(maxHeight: .infinity, alignment: .center)
+
+                            Spacer(minLength: 0)
+
+                            Group {
+                                if showsStopButton {
+                                    Button(action: onStopButtonPressed) {
+                                        Image(systemName: "stop.fill")
+                                            .font(.system(size: 7, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 14, height: 14)
+                                            .background(Circle().fill(Color.red.opacity(0.92)))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                                }
+                            }
+                            .frame(width: trailingAccessoryWidth, alignment: .trailing)
                         }
-                        .frame(width: trailingAccessoryWidth, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(height: contentRowHeight)
+
+                    if showsLiveTranscript {
+                        LiveTranscriptStrip(text: state.liveTranscript)
                     }
                 }
             }
         }
-        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.spring(response: 0.28, dampingFraction: 1.0), value: state.phase)
         .animation(.spring(response: 0.28, dampingFraction: 1.0), value: state.recordingTriggerMode)

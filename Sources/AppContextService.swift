@@ -2,7 +2,7 @@ import Foundation
 import ApplicationServices
 import AppKit
 
-struct AppSelectionSnapshot {
+struct AppSelectionSnapshot: Sendable {
     let appName: String?
     let bundleIdentifier: String?
     let windowTitle: String?
@@ -74,6 +74,13 @@ Use only the supplied local metadata and never infer private details that are no
             windowTitle: focusedWindowTitle(from: appElement) ?? frontmostApp.localizedName,
             selectedText: rawSelectedText(from: appElement)
         )
+    }
+
+    /// Captures selection state without sharing or mutating the long-lived
+    /// AppState service instance. Shortcut preflight calls this from a
+    /// detached task because AX queries into the focused process may block.
+    static func captureSelectionSnapshot() -> AppSelectionSnapshot {
+        AppContextService(apiKey: "").collectSelectionSnapshot()
     }
 
     func collectContext() async -> AppContext {

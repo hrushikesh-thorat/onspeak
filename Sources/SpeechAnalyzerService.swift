@@ -124,6 +124,9 @@ enum SpeechAnalyzerService {
         return context
     }
 
+    /// The accuracy-first transcriber used by both file transcription and the
+    /// streaming commit path. Keep every option set empty: preview-specific
+    /// responsiveness options must never enter committed text.
     static func makeTranscriber(locale: Locale) -> SpeechTranscriber {
         SpeechTranscriber(
             locale: locale,
@@ -133,13 +136,31 @@ enum SpeechAnalyzerService {
         )
     }
 
+    /// A display-only progressive transcriber. Neither its result stream nor
+    /// its options are used by `commitAndAwaitFinal()`.
+    static func makeProgressiveTranscriber(locale: Locale) -> SpeechTranscriber {
+        SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults, .fastResults],
+            attributeOptions: []
+        )
+    }
+
     /// Downloads and reserves the locale's model assets when missing. Safe to
     /// call repeatedly; returns immediately when everything is installed.
     static func ensureAssets(for transcriber: SpeechTranscriber, locale: Locale) async throws {
+        try await ensureAssets(for: [transcriber], locale: locale)
+    }
+
+    /// Downloads and reserves assets compatible with every analyzer module.
+    /// A progressive session passes both transcribers so setup never assumes
+    /// that preparing only the accurate module is sufficient.
+    static func ensureAssets(for modules: [any SpeechModule], locale: Locale) async throws {
         let target = locale.identifier(.bcp47)
-        let installed = await SpeechTranscriber.installedLocales
-        if !installed.contains(where: { $0.identifier(.bcp47) == target }) {
-            if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+        let status = await AssetInventory.status(forModules: modules)
+        if status != .installed {
+            if let request = try await AssetInventory.assetInstallationRequest(supporting: modules) {
                 os_log(.info, log: speechLog, "downloading speech model assets for %{public}@", target)
                 try await request.downloadAndInstall()
                 os_log(.info, log: speechLog, "speech model assets installed for %{public}@", target)
@@ -262,17 +283,30 @@ enum SpeechAnalyzerService {
 final class SpeechAnalyzerStreamingSession: @unchecked Sendable {
     private let localePreference: String
     private let vocabulary: String
+    private let previewEnabled: Bool
+    private let sessionContext: LiveTranscriptSessionContext
 
     /// Serializes all mutable state below and orders sample delivery.
     private let queue = DispatchQueue(label: "com.rushatpeace.onspeak.speechanalyzer-input")
     private var pendingSamples: [Data] = []
     private var finished = false
+    private var cancelled = false
     private var analyzer: SpeechAnalyzer?
     private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
     private var analyzerFormat: AVAudioFormat?
     private var converter: AVAudioConverter?
-    private var resultsTask: Task<String, Error>?
+    private var accurateResultsTask: Task<String, Error>?
+    private var previewResultsTask: Task<Void, Never>?
     private var setupTask: Task<Void, Error>?
+    private var liveTranscriptHandler: ((UUID, String) -> Void)?
+    private var liveTranscriptDeliveryLatch = LiveTranscriptDeliveryLatch()
+    private var didLogFirstLiveTranscript = false
+
+    /// Called on the main queue with the latest composed preview text.
+    var onLiveTranscript: ((UUID, String) -> Void)? {
+        get { queue.sync { liveTranscriptHandler } }
+        set { queue.sync { liveTranscriptHandler = newValue } }
+    }
 
     /// Format of the samples handed to `appendPCM16`: 24 kHz mono Int16,
     /// matching `AudioRecorder.pcm16TargetFormat`.
@@ -283,9 +317,16 @@ final class SpeechAnalyzerStreamingSession: @unchecked Sendable {
         interleaved: true
     )
 
-    init(localePreference: String, vocabulary: String) {
+    init(
+        localePreference: String,
+        vocabulary: String,
+        reportVolatileResults: Bool = false,
+        sessionContext: LiveTranscriptSessionContext = LiveTranscriptSessionContext()
+    ) {
         self.localePreference = localePreference
         self.vocabulary = vocabulary
+        self.previewEnabled = reportVolatileResults
+        self.sessionContext = sessionContext
     }
 
     // MARK: Lifecycle
@@ -294,57 +335,147 @@ final class SpeechAnalyzerStreamingSession: @unchecked Sendable {
     /// surface when `commitAndAwaitFinal()` awaits it.
     func start() {
         setupTask = Task { [self] in
+            logAnalyzerSetupStarted()
             guard SpeechTranscriber.isAvailable else {
                 throw SpeechAnalyzerServiceError.transcriberUnavailable
             }
             let locale = try await SpeechLocaleResolver.resolve(preference: localePreference)
-            let transcriber = SpeechAnalyzerService.makeTranscriber(locale: locale)
-            try await SpeechAnalyzerService.ensureAssets(for: transcriber, locale: locale)
-
-            let analyzer = SpeechAnalyzer(modules: [transcriber])
-            if let context = SpeechAnalyzerService.vocabularyContext(from: vocabulary) {
+            let attempts = SpeechAnalyzerStreamingStartupPlan.attempts(previewEnabled: previewEnabled)
+            for attempt in attempts {
                 do {
-                    try await analyzer.setContext(context)
-                } catch {
-                    os_log(.error, log: speechLog, "setContext failed: %{public}@", error.localizedDescription)
-                }
-            }
-
-            guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
-                throw SpeechAnalyzerServiceError.noCompatibleAudioFormat
-            }
-
-            let (inputSequence, builder) = AsyncStream<AnalyzerInput>.makeStream()
-            let collector = Task<String, Error> {
-                var transcript = AttributedString("")
-                for try await result in transcriber.results {
-                    transcript += result.text
-                }
-                return String(transcript.characters)
-            }
-            try await analyzer.start(inputSequence: inputSequence)
-
-            queue.sync {
-                self.resultsTask = collector
-                if self.finished {
-                    // Cancelled while setting up: shut the analyzer back down.
-                    builder.finish()
-                    collector.cancel()
-                    Task { await analyzer.cancelAndFinishNow() }
+                    try Task.checkCancellation()
+                    try await configureAnalyzer(locale: locale, attempt: attempt)
+                    logAnalyzerSetupCompleted(previewActive: attempt == .accurateAndPreview)
                     return
-                }
-                self.analyzer = analyzer
-                self.inputBuilder = builder
-                self.analyzerFormat = format
-                let backlog = self.pendingSamples
-                self.pendingSamples.removeAll()
-                for data in backlog {
-                    self.convertAndYieldLocked(data)
+                } catch {
+                    if Task.isCancelled || error is CancellationError {
+                        throw CancellationError()
+                    }
+                    guard attempt == .accurateAndPreview else { throw error }
+                    os_log(
+                        .error,
+                        log: speechLog,
+                        "session %{public}@ progressive analyzer setup failed at %{public}d ms; retrying accurate-only: %{public}@",
+                        sessionContext.id.uuidString,
+                        sessionContext.elapsedMilliseconds(),
+                        error.localizedDescription
+                    )
                 }
             }
-            os_log(.info, log: speechLog, "streaming session started (locale: %{public}@)",
-                   locale.identifier(.bcp47))
+            throw SpeechAnalyzerServiceError.sessionNotStarted
         }
+    }
+
+    /// Creates and starts one analyzer attempt. State is published to the
+    /// input queue only after startup succeeds, so a failed combined attempt
+    /// leaves every buffered microphone sample available to the accurate-only
+    /// retry.
+    private func configureAnalyzer(
+        locale: Locale,
+        attempt: SpeechAnalyzerStreamingAttempt
+    ) async throws {
+        let accurateTranscriber = SpeechAnalyzerService.makeTranscriber(locale: locale)
+        let previewTranscriber: SpeechTranscriber?
+        let modules: [any SpeechModule]
+        switch attempt {
+        case .accurateAndPreview:
+            let progressive = SpeechAnalyzerService.makeProgressiveTranscriber(locale: locale)
+            previewTranscriber = progressive
+            modules = [accurateTranscriber, progressive]
+        case .accurateOnly:
+            previewTranscriber = nil
+            modules = [accurateTranscriber]
+        }
+
+        try await SpeechAnalyzerService.ensureAssets(for: modules, locale: locale)
+        try Task.checkCancellation()
+
+        let analyzer = SpeechAnalyzer(modules: modules)
+        if let context = SpeechAnalyzerService.vocabularyContext(from: vocabulary) {
+            do {
+                try await analyzer.setContext(context)
+            } catch {
+                os_log(.error, log: speechLog, "setContext failed: %{public}@", error.localizedDescription)
+            }
+        }
+
+        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: modules) else {
+            throw SpeechAnalyzerServiceError.noCompatibleAudioFormat
+        }
+        try Task.checkCancellation()
+
+        let (inputSequence, builder) = AsyncStream<AnalyzerInput>.makeStream()
+        let accurateCollector = Task<String, Error> {
+            var committed = AttributedString("")
+            for try await result in accurateTranscriber.results {
+                committed += result.text
+            }
+            return String(committed.characters)
+        }
+        let previewCollector: Task<Void, Never>? = previewTranscriber.map { transcriber in
+            Task { [self] in
+                var composer = LiveTranscriptComposer()
+                do {
+                    for try await result in transcriber.results {
+                        composer.ingest(text: result.text, isFinal: result.isFinal)
+                        emitLiveTranscript(composer.previewText)
+                    }
+                } catch is CancellationError {
+                    // Normal teardown; preview failure never reaches commit.
+                } catch {
+                    os_log(
+                        .error,
+                        log: speechLog,
+                        "session %{public}@ progressive result stream stopped at %{public}d ms: %{public}@",
+                        sessionContext.id.uuidString,
+                        sessionContext.elapsedMilliseconds(),
+                        error.localizedDescription
+                    )
+                }
+            }
+        }
+
+        do {
+            try await analyzer.start(inputSequence: inputSequence)
+            try Task.checkCancellation()
+        } catch {
+            builder.finish()
+            accurateCollector.cancel()
+            previewCollector?.cancel()
+            await analyzer.cancelAndFinishNow()
+            throw error
+        }
+
+        let installed = queue.sync { [self] in
+            guard !finished else { return false }
+            self.analyzer = analyzer
+            self.inputBuilder = builder
+            self.analyzerFormat = format
+            self.accurateResultsTask = accurateCollector
+            self.previewResultsTask = previewCollector
+            let backlog = self.pendingSamples
+            self.pendingSamples.removeAll()
+            for data in backlog {
+                self.convertAndYieldLocked(data)
+            }
+            return true
+        }
+
+        guard installed else {
+            builder.finish()
+            accurateCollector.cancel()
+            previewCollector?.cancel()
+            await analyzer.cancelAndFinishNow()
+            throw CancellationError()
+        }
+
+        os_log(
+            .info,
+            log: speechLog,
+            "session %{public}@ streaming session started (locale: %{public}@)",
+            sessionContext.id.uuidString,
+            locale.identifier(.bcp47)
+        )
     }
 
     /// Append raw PCM16 samples. Safe to call from any thread or queue.
@@ -369,37 +500,128 @@ final class SpeechAnalyzerStreamingSession: @unchecked Sendable {
         try await setupTask.value
 
         var analyzer: SpeechAnalyzer?
-        var resultsTask: Task<String, Error>?
+        var accurateResultsTask: Task<String, Error>?
+        var previewResultsTask: Task<Void, Never>?
         queue.sync {
             finished = true
             inputBuilder?.finish()
             inputBuilder = nil
             analyzer = self.analyzer
-            resultsTask = self.resultsTask
+            accurateResultsTask = self.accurateResultsTask
+            previewResultsTask = self.previewResultsTask
         }
-        guard let analyzer, let resultsTask else {
+        guard let analyzer, let accurateResultsTask else {
             throw SpeechAnalyzerServiceError.sessionNotStarted
         }
 
-        try await analyzer.finalizeAndFinishThroughEndOfInput()
-        let transcript = try await SpeechAnalyzerService.awaiting(resultsTask, timeout: 60)
-        return transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try await analyzer.finalizeAndFinishThroughEndOfInput()
+            // The accurate collector is deliberately the only committed-text
+            // source. Preview completion and preview errors are irrelevant.
+            let transcript = try await SpeechAnalyzerService.awaiting(accurateResultsTask, timeout: 60)
+            previewResultsTask?.cancel()
+            return transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            accurateResultsTask.cancel()
+            previewResultsTask?.cancel()
+            throw error
+        }
     }
 
     /// Abandon the session without producing a transcript.
     func cancel() {
         setupTask?.cancel()
-        queue.async { [self] in
+        var analyzerToCancel: SpeechAnalyzer?
+        queue.sync {
             finished = true
+            cancelled = true
+            liveTranscriptHandler = nil
+            liveTranscriptDeliveryLatch.cancel()
             pendingSamples.removeAll()
             inputBuilder?.finish()
             inputBuilder = nil
-            resultsTask?.cancel()
-            if let analyzer {
-                Task { await analyzer.cancelAndFinishNow() }
-            }
+            accurateResultsTask?.cancel()
+            previewResultsTask?.cancel()
+            analyzerToCancel = analyzer
             analyzer = nil
         }
+        if let analyzerToCancel {
+            Task { await analyzerToCancel.cancelAndFinishNow() }
+        }
+    }
+
+    // MARK: Live transcript delivery
+
+    /// Coalesces result-stream updates on the session queue so at most one
+    /// delivery is waiting on the main queue. A newer value replaces the
+    /// pending one instead of adding another main-thread callback.
+    private func emitLiveTranscript(_ text: String) {
+        guard previewEnabled else { return }
+        queue.async { [self] in
+            guard !cancelled else { return }
+            if !text.isEmpty, !didLogFirstLiveTranscript {
+                didLogFirstLiveTranscript = true
+                os_log(
+                    .info,
+                    log: speechLog,
+                    "session %{public}@ first non-empty progressive result received at %{public}d ms",
+                    sessionContext.id.uuidString,
+                    sessionContext.elapsedMilliseconds()
+                )
+            }
+            guard liveTranscriptHandler != nil else { return }
+            guard liveTranscriptDeliveryLatch.enqueue(
+                sessionID: sessionContext.id,
+                text: text
+            ) else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.deliverPendingLiveTranscript()
+            }
+        }
+    }
+
+    /// Runs on the main queue. Taking the pending delivery on `queue` orders
+    /// it against `cancel()`: once cancellation has cleared the handler, an
+    /// already-enqueued main block becomes a no-op and cannot update a later
+    /// UI session.
+    private func deliverPendingLiveTranscript() {
+        dispatchPrecondition(condition: .onQueue(.main))
+        let delivery: (((UUID, String) -> Void), UUID, String)? = queue.sync {
+            guard !cancelled,
+                  let pending = liveTranscriptDeliveryLatch.take(),
+                  let liveTranscriptHandler
+            else {
+                liveTranscriptDeliveryLatch.cancel()
+                return nil
+            }
+            return (liveTranscriptHandler, pending.sessionID, pending.text)
+        }
+        if let delivery {
+            delivery.0(delivery.1, delivery.2)
+        }
+    }
+
+    // MARK: Timing
+
+    private func logAnalyzerSetupStarted() {
+        os_log(
+            .info,
+            log: speechLog,
+            "session %{public}@ analyzer setup started at %{public}d ms",
+            sessionContext.id.uuidString,
+            sessionContext.elapsedMilliseconds()
+        )
+    }
+
+    private func logAnalyzerSetupCompleted(previewActive: Bool) {
+        os_log(
+            .info,
+            log: speechLog,
+            "session %{public}@ analyzer setup completed at %{public}d ms (preview: %{public}@)",
+            sessionContext.id.uuidString,
+            sessionContext.elapsedMilliseconds(),
+            previewActive ? "active" : "inactive"
+        )
     }
 
     // MARK: Audio conversion

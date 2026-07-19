@@ -958,6 +958,17 @@ struct GeneralSettingsView: View {
 
             Divider()
 
+            Toggle(
+                "Show live transcript while speaking",
+                isOn: $appState.liveTranscriptPreviewEnabled
+            )
+
+            Text("Shows on-device speech recognition in the overlay only; the preview never changes your final dictation.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
             overlayDisplaySection
         }
     }

@@ -8,6 +8,12 @@ This project uses semantic versioning for public releases. Use `MAJOR.MINOR.PATC
 - `MINOR` changes add user-visible features and improvements.
 - `PATCH` changes fix bugs, polish existing behavior, or make small internal improvements.
 
+## [0.7.0] - Unreleased
+
+### Added
+
+- Optional live transcript previews in the recording overlay, showing on-device speech recognition while you speak without changing the final dictation.
+
 ## [0.4.0] - 2026-07-19
 
 ### Added

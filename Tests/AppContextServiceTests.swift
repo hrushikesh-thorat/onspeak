@@ -13,6 +13,8 @@ struct AppContextServiceTests {
         DynamicCleanupGuardTests.run()
         DictionaryTermLearnerTests.run()
         DictionaryStoreTests.run()
+        LiveTranscriptComposerTests.run()
+        LiveTranscriptSessionSupportTests.run()
         print("OnSpeakTests passed")
     }
 
