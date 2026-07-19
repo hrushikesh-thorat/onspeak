@@ -585,7 +585,7 @@ struct GeneralSettingsView: View {
     @EnvironmentObject var appState: AppState
     @AppStorage("show_menu_bar_icon") private var showMenuBarIcon = true
     @AppStorage("overlay_display_id") private var overlayDisplayID = 0
-    @AppStorage("use_compact_overlay") private var useCompactOverlay = true
+    @AppStorage("use_bottom_listening_card") private var useBottomListeningCard = true
     @State private var screensVersion = 0
     @State private var apiKeyInput: String = ""
     @State private var apiBaseURLInput: String = ""
@@ -944,17 +944,28 @@ struct GeneralSettingsView: View {
     private var overlaySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             OverlayStyleOptionRow(
-                title: "Minimalist menu-bar overlay",
-                subtitle: "Two slim wings flank the camera notch and stay inside the menu bar. Never covers app tabs or toolbars.",
+                title: "Bottom listening card",
+                subtitle: "A floating live-transcript card above the Dock. Larger, steadier, and easier to read while speaking.",
                 isMinimalist: true,
-                selection: $useCompactOverlay
+                selection: $useBottomListeningCard
             )
             OverlayStyleOptionRow(
-                title: "Drop-down pill",
-                subtitle: "Single pill hangs below the menu bar during recording. Larger and more visible, but covers a thin strip of whatever app is active.",
+                title: "Menu-bar notch",
+                subtitle: "Keep the recording overlay attached to the top menu bar and camera notch.",
                 isMinimalist: false,
-                selection: $useCompactOverlay
+                selection: $useBottomListeningCard
             )
+
+            Divider()
+
+            Toggle(
+                "Show live transcript while speaking",
+                isOn: $appState.liveTranscriptPreviewEnabled
+            )
+
+            Text("Shows on-device speech recognition in the overlay only; the preview never changes your final dictation.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             Divider()
 
