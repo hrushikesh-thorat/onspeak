@@ -8,11 +8,18 @@ This project uses semantic versioning for public releases. Use `MAJOR.MINOR.PATC
 - `MINOR` changes add user-visible features and improvements.
 - `PATCH` changes fix bugs, polish existing behavior, or make small internal improvements.
 
-## [0.7.0] - Unreleased
+## [0.5.0] - 2026-07-19
 
 ### Added
 
-- Optional live transcript previews in the recording overlay, showing on-device speech recognition while you speak without changing the final dictation.
+- Live, on-device transcript previews while speaking, enabled by default without affecting final dictation accuracy.
+- A new bottom listening card with active-app identity, a persistent capsule waveform, smoothly wrapped preview text, a Siri-inspired glow, and hover actions for finishing or cancelling a recording.
+- A menu-bar notch overlay remains available as an alternate style.
+
+### Improved
+
+- Live previews now deliver their first words sooner and update more smoothly throughout longer dictations.
+- The recording overlay now appears immediately and keeps a stable layout through microphone preparation, recording, and final transcription.
 
 ## [0.4.0] - 2026-07-19
 
