@@ -38,6 +38,70 @@ private let iso8601DayFormatter: DateFormatter = {
     return formatter
 }()
 
+/// Surfaces on-device dynamic cleanup availability in Settings, mirroring the
+/// `SpeechModelManager` status pattern. Stage 1's `availability()` only reports
+/// `available` or `unavailable(String)`, flattening Foundation Models' structured
+/// `UnavailableReason`, so the specific failure copy from spec 001's table is
+/// recovered here by matching the reason string.
+@MainActor
+private final class DynamicCleanupAvailabilityModel: ObservableObject {
+    enum Status: Equatable {
+        case unknown
+        case available
+        case appleIntelligenceOff
+        case gettingReady
+        case deviceNotEligible
+        case unavailable(String)
+
+        var description: String {
+            switch self {
+            case .unknown:
+                return "Checking on-device model…"
+            case .available:
+                return "On-device model ready. Dynamic Cleanup is active."
+            case .appleIntelligenceOff:
+                return "Turn on Apple Intelligence in System Settings to use Dynamic Cleanup. Until then, basic cleanup is used."
+            case .gettingReady:
+                return "The on-device model is getting ready. Basic cleanup is used until it finishes."
+            case .deviceNotEligible:
+                return "This Mac can't run the on-device model. Basic cleanup is used instead."
+            case .unavailable(let reason):
+                return "Dynamic Cleanup is unavailable (\(reason)). Basic cleanup is used instead."
+            }
+        }
+
+        var isReady: Bool { self == .available }
+    }
+
+    @Published private(set) var status: Status = .unknown
+
+    private var refreshTask: Task<Void, Never>?
+
+    func refresh() {
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            let availability = await AppleFoundationModelsPostProcessor.shared.availability()
+            guard !Task.isCancelled else { return }
+            self?.status = Self.mapped(availability)
+        }
+    }
+
+    private static func mapped(_ availability: DynamicCleanupAvailability) -> Status {
+        switch availability {
+        case .available:
+            return .available
+        case .appleIntelligenceNotEnabled:
+            return .appleIntelligenceOff
+        case .modelNotReady:
+            return .gettingReady
+        case .deviceNotEligible:
+            return .deviceNotEligible
+        case .unavailable(let reason):
+            return .unavailable(reason)
+        }
+    }
+}
+
 struct ProviderSettingsFields: View {
     @EnvironmentObject var appState: AppState
     @Binding var apiBaseURLInput: String
@@ -446,6 +510,8 @@ struct SettingsView: View {
                 switch appState.selectedSettingsTab {
                 case .general, .none:
                     GeneralSettingsView()
+                case .dictionary:
+                    DictionarySettingsView()
                 case .prompts:
                     PromptsSettingsView()
                 case .macros:
@@ -529,11 +595,11 @@ struct GeneralSettingsView: View {
     @State private var isValidatingKey = false
     @State private var keyValidationError: String?
     @State private var keyValidationSuccess = false
-    @State private var customVocabularyInput: String = ""
     @State private var micPermissionGranted = false
     @State private var showMutedHint = false
     @State private var copiedBuildInfo = false
     @State private var copiedBuildInfoResetWorkItem: DispatchWorkItem?
+    @StateObject private var dynamicCleanupAvailability = DynamicCleanupAvailabilityModel()
 
     private var appDisplayName: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
@@ -616,9 +682,6 @@ struct GeneralSettingsView: View {
                 SettingsCard("Sound Volume", icon: "speaker.wave.2.fill") {
                     soundVolumeSection
                 }
-                SettingsCard("Custom Vocabulary", icon: "text.book.closed.fill") {
-                    vocabularySection
-                }
                 SettingsCard("Permissions", icon: "lock.shield.fill") {
                     permissionsSection
                 }
@@ -633,9 +696,12 @@ struct GeneralSettingsView: View {
             apiBaseURLInput = appState.apiBaseURL
             transcriptionAPIURLInput = appState.transcriptionAPIURL
             transcriptionAPIKeyInput = appState.transcriptionAPIKey
-            customVocabularyInput = appState.customVocabulary
             checkMicPermission()
             appState.refreshLaunchAtLoginStatus()
+            dynamicCleanupAvailability.refresh()
+        }
+        .onChange(of: appState.dynamicCleanupEnabled) { _ in
+            dynamicCleanupAvailability.refresh()
         }
         .onChange(of: appState.transcriptionAPIURL) { value in
             if transcriptionAPIURLInput != value {
@@ -1016,12 +1082,40 @@ struct GeneralSettingsView: View {
 
     private var cleanupSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Toggle("Dynamic Cleanup", isOn: $appState.dynamicCleanupEnabled)
+
+            Text("Basic cleanup is a fast, deterministic pass on your Mac — fillers, spacing, safe repeats. Dynamic Cleanup adds Apple's on-device model to fix self-corrections, dictated punctuation, and formatting, with no network and no account. It falls back to basic cleanup whenever the model isn't available.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            dynamicCleanupStatusRow
+                .opacity(appState.dynamicCleanupEnabled ? 1 : 0.5)
+
+            Divider()
+                .padding(.vertical, 2)
+
             Toggle("Preserve exact wording", isOn: $appState.preserveExactWording)
 
             Text("When on, \(AppName.displayName) skips local cleanup and pastes the transcript verbatim. Voice macros still run.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var dynamicCleanupStatusRow: some View {
+        let status = dynamicCleanupAvailability.status
+        return HStack(alignment: .top, spacing: 6) {
+            Image(systemName: status.isReady ? "checkmark.circle.fill" : "info.circle.fill")
+                .foregroundStyle(status.isReady ? Color.green : Color.orange)
+                .font(.caption)
+            Text(status.description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(6)
     }
 
     // MARK: Clipboard
@@ -1133,31 +1227,6 @@ struct GeneralSettingsView: View {
         }
     }
 
-    // MARK: Custom Vocabulary
-
-    private var vocabularySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Words and phrases to preserve during post-processing.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            TextEditor(text: $customVocabularyInput)
-                .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 80, maxHeight: 140)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                )
-                .onChange(of: customVocabularyInput) { newValue in
-                    appState.customVocabulary = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-
-            Text("Separate entries with commas, new lines, or semicolons.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
     // MARK: Permissions
 
     private var permissionsSection: some View {
@@ -1214,6 +1283,266 @@ struct GeneralSettingsView: View {
         micPermissionGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     }
 
+}
+
+// MARK: - Dictionary Settings
+
+/// Settings → Dictionary: the personal dictionary's learning toggle, pending
+/// suggestions, searchable term list, and the `spoken -> replacement`
+/// corrections editor (which stays backed by the legacy `custom_vocabulary`
+/// string — corrections were never migrated into the dictionary).
+struct DictionarySettingsView: View {
+    @EnvironmentObject var appState: AppState
+    @ObservedObject private var store = DictionaryStore.shared
+    @State private var searchText: String = ""
+    @State private var correctionsInput: String = ""
+
+    private var suggestedEntries: [DictionaryEntry] {
+        store.entries
+            .filter { $0.source == .learned && $0.status == .suggested }
+            .sorted {
+                if $0.observationCount != $1.observationCount {
+                    return $0.observationCount > $1.observationCount
+                }
+                return $0.updatedAt > $1.updatedAt
+            }
+    }
+
+    private var listedEntries: [DictionaryEntry] {
+        let active = store.entries.filter { $0.status == .active }
+        let manual = active
+            .filter { $0.source == .manual }
+            .sorted { $0.term.localizedCaseInsensitiveCompare($1.term) == .orderedAscending }
+        let learned = active
+            .filter { $0.source == .learned }
+            .sorted { $0.term.localizedCaseInsensitiveCompare($1.term) == .orderedAscending }
+        let all = manual + learned
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return all }
+        return all.filter { $0.term.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                SettingsCard("Learning", icon: "brain") {
+                    learningSection
+                }
+                if !suggestedEntries.isEmpty {
+                    SettingsCard("Suggested", icon: "lightbulb") {
+                        suggestedSection
+                    }
+                }
+                SettingsCard("Dictionary", icon: "character.book.closed") {
+                    dictionaryListSection
+                }
+                SettingsCard("Spoken Corrections", icon: "arrow.left.arrow.right") {
+                    correctionsSection
+                }
+            }
+            .padding(24)
+        }
+        .onAppear {
+            correctionsInput = appState.customVocabulary
+        }
+    }
+
+    // MARK: Learning toggle
+
+    private var learningSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Learn new words automatically", isOn: $store.learningEnabled)
+
+            Text("\(AppName.displayName) notices unusual words that keep appearing in your dictations — names, acronyms, technical terms — and suggests them here. A word is suggested after it is heard in \(DictionaryStore.learningThreshold) separate dictations. Everything stays on this Mac.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: Suggested
+
+    private var suggestedSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Words \(AppName.displayName) has noticed but not yet added. Approve to start using one right away, or reject to never see it again.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: 1) {
+                ForEach(suggestedEntries) { entry in
+                    HStack(spacing: 10) {
+                        Text(entry.term)
+                            .font(.body)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        Text("heard \(entry.observationCount)×")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Button("Approve") {
+                            store.approve(id: entry.id)
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.caption)
+
+                        Button("Reject") {
+                            store.reject(id: entry.id)
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.8))
+                }
+            }
+            .cornerRadius(8)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.06), lineWidth: 1))
+        }
+    }
+
+    // MARK: Main list
+
+    private var dictionaryListSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Words and phrases \(AppName.displayName) is biased toward when transcribing. Disable a word to mute it without losing it.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                TextField("Search dictionary", text: $searchText)
+                    .textFieldStyle(.plain)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3), lineWidth: 1))
+
+            if listedEntries.isEmpty {
+                VStack {
+                    Image(systemName: "character.book.closed")
+                        .font(.system(size: 30))
+                        .foregroundStyle(.tertiary)
+                        .padding(.bottom, 4)
+                    Text(searchText.isEmpty ? "No Words Yet" : "No Matches")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Text(searchText.isEmpty
+                         ? "Use \"Paste Custom Word to Vocabulary\" in the menu bar, or let \(AppName.displayName) learn words from your dictations."
+                         : "No dictionary entries match \"\(searchText)\".")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+            } else {
+                VStack(spacing: 1) {
+                    ForEach(listedEntries) { entry in
+                        dictionaryRow(entry)
+                    }
+                }
+                .cornerRadius(8)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.06), lineWidth: 1))
+            }
+        }
+    }
+
+    private func dictionaryRow(_ entry: DictionaryEntry) -> some View {
+        HStack(spacing: 10) {
+            Text(entry.term)
+                .font(.body)
+                .foregroundStyle(entry.isEnabled ? .primary : .secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            sourceBadge(entry.source)
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { entry.isEnabled },
+                set: { store.setEnabled($0, for: entry.id) }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .labelsHidden()
+
+            Button {
+                store.delete(id: entry.id)
+            } label: {
+                Image(systemName: "trash")
+                    .font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.red)
+            .help("Delete \"\(entry.term)\" from the dictionary")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.8))
+    }
+
+    private func sourceBadge(_ source: DictionaryEntry.Source) -> some View {
+        Text(source == .manual ? "Manual" : "Learned")
+            .font(.caption2.weight(.medium))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule().fill(
+                    source == .manual
+                        ? Color.accentColor.opacity(0.15)
+                        : Color.green.opacity(0.15)
+                )
+            )
+            .foregroundStyle(source == .manual ? Color.accentColor : Color.green)
+    }
+
+    // MARK: Spoken corrections
+
+    private var correctionsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Rewrite words \(AppName.displayName) keeps hearing wrong. One \"spoken -> replacement\" line per correction.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            TextEditor(text: $correctionsInput)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 80, maxHeight: 140)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                )
+                .onChange(of: correctionsInput) { newValue in
+                    appState.customVocabulary = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+
+            Text("Example: \"jason -> JSON\". Lines starting with # are ignored.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
 }
 
 // MARK: - Microphone Option Row

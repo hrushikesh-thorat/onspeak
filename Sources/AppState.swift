@@ -21,6 +21,7 @@ struct PrecomputedMacro {
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
+    case dictionary
     case prompts
     case macros
     case runLog
@@ -28,11 +29,12 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    static var visibleCases: [SettingsTab] { [.general, .macros, .runLog] }
+    static var visibleCases: [SettingsTab] { [.general, .dictionary, .macros, .runLog] }
 
     var title: String {
         switch self {
         case .general: return "General"
+        case .dictionary: return "Dictionary"
         case .prompts: return "Prompts"
         case .macros: return "Voice Macros"
         case .runLog: return "Run Log"
@@ -43,6 +45,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .general: return "gearshape"
+        case .dictionary: return "character.book.closed"
         case .prompts: return "text.bubble"
         case .macros: return "music.mic"
         case .runLog: return "clock.arrow.circlepath"
@@ -211,6 +214,11 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private let shortcutStartDelayStorageKey = "shortcut_start_delay"
     private let preserveClipboardStorageKey = "preserve_clipboard"
     private let preserveExactWordingStorageKey = "preserve_exact_wording"
+    private let dynamicCleanupEnabledStorageKey = "dynamic_cleanup_enabled"
+    /// Legacy 0.3.x key. Read once at load time as the carry-over source when
+    /// `dynamicCleanupEnabledStorageKey` has never been written; never written
+    /// to going forward.
+    private let legacySmartCleanupEnabledStorageKey = "smart_cleanup_enabled"
     private let keepDictationInClipboardHistoryStorageKey = "keep_dictation_in_clipboard_history"
     private let pressEnterVoiceCommandStorageKey = "press_enter_voice_command_enabled"
     private let alertSoundsEnabledStorageKey = "alert_sounds_enabled"
@@ -488,6 +496,12 @@ final class AppState: ObservableObject, @unchecked Sendable {
         }
     }
 
+    @Published var dynamicCleanupEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(dynamicCleanupEnabled, forKey: dynamicCleanupEnabledStorageKey)
+        }
+    }
+
     @Published var keepDictationInClipboardHistory: Bool {
         didSet {
             UserDefaults.standard.set(keepDictationInClipboardHistory, forKey: keepDictationInClipboardHistoryStorageKey)
@@ -586,6 +600,10 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private var pendingShortcutStartTask: Task<Void, Never>?
     private var pendingShortcutStartMode: RecordingTriggerMode?
     private var nativeStreamingSession: SpeechAnalyzerStreamingSession?
+    /// Identifies the on-device dynamic cleanup session prewarmed for the current
+    /// dictation. Set when recording starts, consumed by `processTranscript`,
+    /// and discarded on the same cancel paths as `nativeStreamingSession`.
+    private var dynamicCleanupSessionID: UUID?
     private var automaticTerminationDisabled = false
     private var activeAudioInterruption: ActiveAudioInterruption?
     private var pendingOverlayDismissToken: UUID?
@@ -656,6 +674,18 @@ final class AppState: ObservableObject, @unchecked Sendable {
             ? true
             : UserDefaults.standard.bool(forKey: preserveClipboardStorageKey)
         let preserveExactWording = UserDefaults.standard.bool(forKey: preserveExactWordingStorageKey)
+        // Opt-in at 0.3.0: absent defaults to `false` via `bool(forKey:)`. One-time
+        // carry-over from the pre-rename key: when the new key has never been
+        // written but the legacy key exists, seed the initial value from it so a
+        // dev machine upgrading from the old build name doesn't silently reset to
+        // off. The legacy key itself is left untouched.
+        let dynamicCleanupEnabled: Bool
+        if UserDefaults.standard.object(forKey: dynamicCleanupEnabledStorageKey) == nil,
+           UserDefaults.standard.object(forKey: legacySmartCleanupEnabledStorageKey) != nil {
+            dynamicCleanupEnabled = UserDefaults.standard.bool(forKey: legacySmartCleanupEnabledStorageKey)
+        } else {
+            dynamicCleanupEnabled = UserDefaults.standard.bool(forKey: dynamicCleanupEnabledStorageKey)
+        }
         let keepDictationInClipboardHistory = UserDefaults.standard.bool(forKey: keepDictationInClipboardHistoryStorageKey)
         let realtimeStreamingEnabled = UserDefaults.standard.bool(forKey: realtimeStreamingEnabledStorageKey)
         let realtimeStreamingModel = UserDefaults.standard.string(forKey: realtimeStreamingModelStorageKey) ?? ""
@@ -728,6 +758,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         self.shortcutStartDelay = shortcutStartDelay
         self.preserveClipboard = preserveClipboard
         self.preserveExactWording = preserveExactWording
+        self.dynamicCleanupEnabled = dynamicCleanupEnabled
         self.keepDictationInClipboardHistory = keepDictationInClipboardHistory
         self.realtimeStreamingEnabled = realtimeStreamingEnabled
         self.realtimeStreamingModel = realtimeStreamingModel
@@ -741,6 +772,12 @@ final class AppState: ObservableObject, @unchecked Sendable {
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
         self.selectedMicrophoneID = selectedMicrophoneID
         self.precomputeMacros()
+
+        // Personal dictionary (Iteration 2): one-time import of the legacy
+        // free-form vocabulary into manual entries. Idempotent (guarded by
+        // `dictionary_migrated_v1`) and read-only on the legacy string, so a
+        // downgrade to 0.3.x still finds `custom_vocabulary` intact.
+        DictionaryStore.shared.migrateLegacyVocabularyIfNeeded(rawVocabulary: customVocabulary)
 
         refreshAvailableMicrophones()
         installAudioDeviceObservers()
@@ -971,11 +1008,33 @@ final class AppState: ObservableObject, @unchecked Sendable {
         return normalized
     }
 
+    /// Upper bound on personal-dictionary terms handed to the on-device
+    /// recognizer and the dynamic-cleanup spelling reference. Recognition biasing
+    /// has a practical ceiling; `DictionaryStore.activeTerms()` is ordered
+    /// manual-first then learned by descending observation count, so the
+    /// strongest terms survive this cap.
+    static let dictionaryBiasingTermLimit = 300
+
+    /// The personal dictionary's active terms, capped for the recognizer and
+    /// dynamic-cleanup context. Replaces the old free-form `customVocabulary`
+    /// split for biasing; `custom_vocabulary` is now read only for corrections.
+    static func dictionaryBiasingTerms() -> [String] {
+        Array(DictionaryStore.shared.activeTerms().prefix(dictionaryBiasingTermLimit))
+    }
+
+    /// Comma-joined form of ``dictionaryBiasingTerms()`` for the
+    /// `SpeechAnalyzerService` vocabulary parameter, which splits on commas and
+    /// newlines. Empty when the dictionary has no active terms, matching an
+    /// empty vocabulary box.
+    static func dictionaryBiasingVocabularyString() -> String {
+        dictionaryBiasingTerms().joined(separator: ", ")
+    }
+
     func transcribeAudioFile(_ fileURL: URL) async throws -> String {
         try await SpeechAnalyzerService.transcribe(
             fileURL: fileURL,
             localePreference: transcriptionLanguage,
-            vocabulary: customVocabulary
+            vocabulary: Self.dictionaryBiasingVocabularyString()
         )
     }
 
@@ -1156,7 +1215,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
                     customVocabulary: capturedCustomVocabulary,
                     customSystemPrompt: capturedCustomSystemPrompt,
                     outputLanguage: self.outputLanguage,
-                    preserveExactWording: self.preserveExactWording
+                    preserveExactWording: self.preserveExactWording,
+                    dynamicCleanupEnabled: self.dynamicCleanupEnabled,
+                    dynamicCleanupSessionID: nil
                 )
                 finalTranscript = result.finalTranscript
                 processingStatus = Self.statusMessage(
@@ -2012,6 +2073,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
         }
 
         startNativeStreamingSession()
+        prepareDynamicCleanupSessionIfEnabled()
 
         // Start engine on background thread so UI isn't blocked
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -2245,6 +2307,8 @@ final class AppState: ObservableObject, @unchecked Sendable {
         case skippedEmptyRawTranscript
         case voiceMacro(command: String)
         case basicCleanup
+        case dynamicCleanup
+        case dynamicCleanupFailedFallback(reason: String)
         case postProcessingSucceeded
         case postProcessingFailedFallback
         case preservedExactWording
@@ -2261,6 +2325,14 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 return "Voice macro used: \(command)"
             case .basicCleanup:
                 return "Basic on-device cleanup used"
+            case .dynamicCleanup:
+                return "Cleaned up on-device"
+            case .dynamicCleanupFailedFallback(let reason):
+                // Base copy is fixed per spec 001; the specific reason is
+                // appended so the Run Log entry's processingStatus carries the
+                // tuning data for the golden suite.
+                let base = "Dynamic Cleanup unavailable — pasted basic cleanup"
+                return reason.isEmpty ? base : "\(base) (\(reason))"
             case .postProcessingSucceeded:
                 return isRetry ? "Post-processing succeeded (retried)" : "Post-processing succeeded"
             case .postProcessingFailedFallback:
@@ -2289,7 +2361,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
         customVocabulary: String,
         customSystemPrompt: String,
         outputLanguage: String = "",
-        preserveExactWording: Bool
+        preserveExactWording: Bool,
+        dynamicCleanupEnabled: Bool = false,
+        dynamicCleanupSessionID: UUID? = nil
     ) async -> (finalTranscript: String, outcome: TranscriptProcessingOutcome, prompt: String) {
         let trimmedRawTranscript = rawTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -2315,7 +2389,30 @@ final class AppState: ObservableObject, @unchecked Sendable {
         // Fast local path: conservative filler, stutter, repetition and
         // spacing cleanup. No inherited provider credentials are consulted.
         let corrections = TranscriptTidier.CorrectionMapping.parse(customVocabulary)
-        return (TranscriptTidier.tidy(trimmedRawTranscript, corrections: corrections), .basicCleanup, "")
+        let tidiedTranscript = TranscriptTidier.tidy(trimmedRawTranscript, corrections: corrections)
+
+        // Optional on-device semantic cleanup layered on top of the tidier. The
+        // tidied text is the safety net: when dynamic cleanup is off or the model
+        // is unavailable we return it as `.basicCleanup` (byte-identical to
+        // 0.2.0), and any thrown failure returns it as `.dynamicCleanupFailedFallback`
+        // so a paste never ends up empty or errored when the tidier had output.
+        guard dynamicCleanupEnabled else {
+            return (tidiedTranscript, .basicCleanup, "")
+        }
+        let processor = AppleFoundationModelsPostProcessor.shared
+        guard case .available = await processor.availability() else {
+            return (tidiedTranscript, .basicCleanup, "")
+        }
+        do {
+            let request = DynamicCleanupRequest(
+                transcript: tidiedTranscript,
+                vocabulary: Self.dictionaryBiasingTerms()
+            )
+            let response = try await processor.cleanup(request, sessionID: dynamicCleanupSessionID)
+            return (response.text, .dynamicCleanup, response.prompt)
+        } catch {
+            return (tidiedTranscript, .dynamicCleanupFailedFallback(reason: error.localizedDescription), "")
+        }
     }
 
     /// Prefer the transcript streamed while the user was speaking. If the
@@ -2474,7 +2571,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
                         customVocabulary: self.customVocabulary,
                         customSystemPrompt: self.customSystemPrompt,
                         outputLanguage: self.outputLanguage,
-                        preserveExactWording: self.preserveExactWording
+                        preserveExactWording: self.preserveExactWording,
+                        dynamicCleanupEnabled: self.dynamicCleanupEnabled,
+                        dynamicCleanupSessionID: self.dynamicCleanupSessionID
                     )
                     try Task.checkCancellation()
 
@@ -2508,6 +2607,11 @@ final class AppState: ObservableObject, @unchecked Sendable {
                             intent: sessionIntent,
                             audioFileName: savedAudioFile?.fileName
                         )
+                        self.learnDictionaryTerms(
+                            from: trimmedFinalTranscript,
+                            intent: sessionIntent,
+                            outcome: result.outcome
+                        )
                         self.transcriptionTask = nil
                         self.transcribingAudioFileName = nil
                         self.lastTranscript = trimmedFinalTranscript
@@ -2521,7 +2625,11 @@ final class AppState: ObservableObject, @unchecked Sendable {
                         let shouldPersistRawDictationFallback: Bool
                         switch result.outcome {
                         case .postProcessingFailedFallback,
-                             .preservedExactWordingTranslationFailedFallback:
+                             .preservedExactWordingTranslationFailedFallback,
+                             .dynamicCleanupFailedFallback:
+                            // Same brief failure indicator as post-processing:
+                            // signal that a fallback happened while still pasting
+                            // the tidied text.
                             shouldPersistRawDictationFallback = !trimmedFinalTranscript.isEmpty
                         default:
                             shouldPersistRawDictationFallback = false
@@ -2662,10 +2770,32 @@ final class AppState: ObservableObject, @unchecked Sendable {
         }
     }
 
+    /// Teaches the personal dictionary from a completed dictation. Only plain
+    /// dictation output feeds the learner: command-mode results and voice-macro
+    /// payloads (canned text, not speech) never observe. Runs only when the
+    /// learning off switch is on and the final transcript is non-empty;
+    /// `DictionaryTermLearner` proposes conservative candidates and
+    /// `DictionaryStore.observe` requires three independent observations before
+    /// a term activates.
+    private func learnDictionaryTerms(
+        from finalTranscript: String,
+        intent: SessionIntent,
+        outcome: TranscriptProcessingOutcome
+    ) {
+        guard DictionaryStore.shared.learningEnabled else { return }
+        guard case .dictation = intent else { return }
+        if case .voiceMacro = outcome { return }
+        let trimmed = finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let candidates = DictionaryTermLearner.candidates(from: trimmed)
+        guard !candidates.isEmpty else { return }
+        DictionaryStore.shared.observe(candidateTerms: candidates)
+    }
+
     private func startNativeStreamingSession() {
         let session = SpeechAnalyzerStreamingSession(
             localePreference: transcriptionLanguage,
-            vocabulary: customVocabulary
+            vocabulary: Self.dictionaryBiasingVocabularyString()
         )
         session.start()
         nativeStreamingSession = session
@@ -2678,6 +2808,30 @@ final class AppState: ObservableObject, @unchecked Sendable {
         audioRecorder.onPCM16Samples = nil
         nativeStreamingSession?.cancel()
         nativeStreamingSession = nil
+        discardDynamicCleanupSession()
+    }
+
+    /// Prewarms an on-device dynamic cleanup session alongside the streaming
+    /// transcriber so model latency overlaps the user's speaking time and
+    /// cleanup can land inside the existing "Transcribing…" phase. No-op when
+    /// the feature is off; the post-processor itself no-ops when the model is
+    /// unavailable, so no availability check is needed here.
+    private func prepareDynamicCleanupSessionIfEnabled() {
+        guard dynamicCleanupEnabled else {
+            dynamicCleanupSessionID = nil
+            return
+        }
+        let sessionID = UUID()
+        dynamicCleanupSessionID = sessionID
+        Task { await AppleFoundationModelsPostProcessor.shared.prepare(sessionID: sessionID) }
+    }
+
+    /// Discards the prewarmed dynamic cleanup session, mirroring how
+    /// `nativeStreamingSession` is torn down on cancel/failure paths.
+    private func discardDynamicCleanupSession() {
+        guard let sessionID = dynamicCleanupSessionID else { return }
+        dynamicCleanupSessionID = nil
+        Task { await AppleFoundationModelsPostProcessor.shared.cancel(sessionID: sessionID) }
     }
 
     private func startContextCapture() {

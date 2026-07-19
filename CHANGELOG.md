@@ -8,6 +8,19 @@ This project uses semantic versioning for public releases. Use `MAJOR.MINOR.PATC
 - `MINOR` changes add user-visible features and improvements.
 - `PATCH` changes fix bugs, polish existing behavior, or make small internal improvements.
 
+## [0.4.0] - 2026-07-19
+
+### Added
+
+- Dynamic Cleanup: an opt-in, fully on-device cleanup layer powered by Apple's Foundation Models. It resolves self-corrections, converts dictated punctuation, tidies formatting, and falls back safely to basic cleanup when the model is unavailable or its output is uncertain.
+- A Dynamic Cleanup toggle and on-device model availability status in Settings. Run Log entries show whether each dictation used Dynamic Cleanup or basic cleanup, including the fallback reason.
+- A personal dictionary in Settings for names, products, and technical terms, with search, per-term enable/disable, and delete. Existing custom vocabulary migrates automatically, while `spoken -> replacement` corrections continue to work from the same tab.
+- Optional on-device vocabulary learning. OnSpeak notices unusual terms across successful dictations, suggests them, and activates a term after it is heard three separate times. Learned terms improve speech recognition and Dynamic Cleanup spelling.
+
+### Improved
+
+- Dynamic Cleanup now handles sentence capitalization, terminal punctuation, and developer syntax such as "dash dash fix" more reliably.
+
 ## [0.2.0] - 2026-07-18
 
 ### Added

@@ -10,6 +10,9 @@ struct AppContextServiceTests {
         testQwenCleanupDisablesReasoning()
         TranscriptTidierTests.run()
         ShortcutTests.run()
+        DynamicCleanupGuardTests.run()
+        DictionaryTermLearnerTests.run()
+        DictionaryStoreTests.run()
         print("OnSpeakTests passed")
     }
 
