@@ -18,6 +18,8 @@ final class RecordingOverlayState: ObservableObject {
     @Published var errorMessage: String?
     @Published var toastID: UUID?
     @Published var liveTranscript: String = ""
+    @Published var targetApplicationName: String = "Current App"
+    @Published var targetApplicationIcon: NSImage?
 }
 
 enum OverlayPhase {
@@ -64,17 +66,162 @@ private func makeNotchContent<V: View>(
     width: CGFloat,
     height: CGFloat,
     cornerRadius: CGFloat,
+    showsSiriBorder: Bool,
     rootView: V
 ) -> NSView {
-    let shaped = rootView
-        .frame(width: width, height: height)
-        .background(Color.black)
-        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: cornerRadius, bottomTrailingRadius: cornerRadius))
+    let shape = UnevenRoundedRectangle(
+        bottomLeadingRadius: cornerRadius,
+        bottomTrailingRadius: cornerRadius
+    )
+    let shaped = ZStack {
+        rootView
+            .frame(width: width, height: height)
+            .background(Color.black)
+
+        if showsSiriBorder {
+            SiriNotchBorder(cornerRadius: cornerRadius)
+        }
+    }
+    .frame(width: width, height: height)
+    .clipShape(shape)
 
     let hosting = NSHostingView(rootView: shaped)
     hosting.frame = NSRect(x: 0, y: 0, width: width, height: height)
     hosting.autoresizingMask = [.width, .height]
     return hosting
+}
+
+private func makeBottomCardContent<V: View>(
+    width: CGFloat,
+    height: CGFloat,
+    showsSiriBorder: Bool,
+    rootView: V
+) -> NSView {
+    let glowInset: CGFloat = 6
+    let cardWidth = max(0, width - glowInset * 2)
+    let cardHeight = max(0, height - glowInset * 2)
+    let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+    let shaped = ZStack {
+        rootView
+            .frame(width: cardWidth, height: cardHeight)
+            .background(Color(red: 0.105, green: 0.105, blue: 0.115))
+            .clipShape(shape)
+
+        if showsSiriBorder {
+            SiriFloatingCardBorder()
+                .frame(width: cardWidth, height: cardHeight)
+        }
+    }
+    .frame(width: width, height: height)
+
+    let hosting = NSHostingView(rootView: shaped)
+    hosting.frame = NSRect(x: 0, y: 0, width: width, height: height)
+    hosting.autoresizingMask = [.width, .height]
+    return hosting
+}
+
+/// A low-key Siri-inspired rim whose blue, violet, and pink highlights travel
+/// around the island without changing its geometry or covering its content.
+private struct SiriNotchBorder: View {
+    let cornerRadius: CGFloat
+
+    private let colors: [Color] = [
+        Color(red: 0.18, green: 0.72, blue: 1.00),
+        Color(red: 0.47, green: 0.31, blue: 1.00),
+        Color(red: 0.98, green: 0.24, blue: 0.70),
+        Color(red: 0.35, green: 0.78, blue: 1.00),
+        Color(red: 0.18, green: 0.72, blue: 1.00),
+    ]
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            let cycle = timeline.date.timeIntervalSinceReferenceDate
+                .truncatingRemainder(dividingBy: 7.0)
+            let phase = cycle / 7.0 * 360
+            SiriNotchRimShape(cornerRadius: cornerRadius)
+                .stroke(
+                    AngularGradient(
+                        colors: colors,
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    style: StrokeStyle(
+                        lineWidth: 2.25,
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
+                )
+                .shadow(color: Color.purple.opacity(0.45), radius: 3)
+                .shadow(color: Color.blue.opacity(0.28), radius: 5)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Open outline for the island's sides and rounded bottom. The top edge stays
+/// unadorned so it visually merges with the black display bezel/notch area.
+private struct SiriNotchRimShape: Shape {
+    let cornerRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let inset: CGFloat = 1.25
+        let radius = min(cornerRadius, max(0, rect.width / 2 - inset))
+        let left = rect.minX + inset
+        let right = rect.maxX - inset
+        let bottom = rect.maxY - inset
+
+        var path = Path()
+        path.move(to: CGPoint(x: left, y: rect.minY))
+        path.addLine(to: CGPoint(x: left, y: bottom - radius))
+        path.addQuadCurve(
+            to: CGPoint(x: left + radius, y: bottom),
+            control: CGPoint(x: left, y: bottom)
+        )
+        path.addLine(to: CGPoint(x: right - radius, y: bottom))
+        path.addQuadCurve(
+            to: CGPoint(x: right, y: bottom - radius),
+            control: CGPoint(x: right, y: bottom)
+        )
+        path.addLine(to: CGPoint(x: right, y: rect.minY))
+        return path
+    }
+}
+
+/// Full animated rim for the floating card. Unlike the top-mounted notch,
+/// every edge is visible because the card sits away from the screen bezel.
+private struct SiriFloatingCardBorder: View {
+    private let colors: [Color] = [
+        Color(red: 0.18, green: 0.72, blue: 1.00),
+        Color(red: 0.47, green: 0.31, blue: 1.00),
+        Color(red: 0.98, green: 0.24, blue: 0.70),
+        Color(red: 0.35, green: 0.78, blue: 1.00),
+        Color(red: 0.18, green: 0.72, blue: 1.00),
+    ]
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            let cycle = timeline.date.timeIntervalSinceReferenceDate
+                .truncatingRemainder(dividingBy: 7.0)
+            let phase = cycle / 7.0 * 360
+
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(
+                    AngularGradient(
+                        colors: colors,
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: 1.15
+                )
+                .shadow(color: Color.pink.opacity(0.38), radius: 5)
+                .shadow(color: Color.blue.opacity(0.22), radius: 7)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
 }
 
 // MARK: - Manager
@@ -92,10 +239,14 @@ final class RecordingOverlayManager {
         liveTranscriptSessionGate.activeSessionID
     }
 
-    fileprivate static let liveTranscriptStripHeight: CGFloat = 28
+    fileprivate static let liveTranscriptStripHeight: CGFloat = 64
     private static let maximumLiveTranscriptWidth: CGFloat = 420
+    private static let bottomCardWidth: CGFloat = 336
+    private static let bottomCardHeight: CGFloat = 124
+    private static let bottomCardCompactHeight: CGFloat = 64
 
     var onStopButtonPressed: (() -> Void)?
+    var onCancelButtonPressed: (() -> Void)?
     var onUpdateOverlayPressed: (() -> Void)?
 
     /// The screen the overlay should drop down on. The user picks one of
@@ -142,8 +293,22 @@ final class RecordingOverlayManager {
     }
 
     private var overlayAcceptsMouseEvents: Bool {
-        (overlayState.phase == .recording && overlayState.recordingTriggerMode == .manual)
+        if usesBottomListeningCard {
+            switch overlayState.phase {
+            case .initializing, .recording, .transcribing, .updateAvailable:
+                return true
+            case .feedback:
+                return false
+            }
+        }
+        return (overlayState.phase == .recording && overlayState.recordingTriggerMode == .manual)
             || overlayState.phase == .updateAvailable
+    }
+
+    /// New and existing installs default to the bottom card. The menu-bar/notch
+    /// presentation remains available as an explicit alternate style.
+    private var usesBottomListeningCard: Bool {
+        (UserDefaults.standard.object(forKey: "use_bottom_listening_card") as? Bool) ?? true
     }
 
     /// Establishes the overlay boundary for one real recording attempt before
@@ -172,6 +337,7 @@ final class RecordingOverlayManager {
         performOnMainSynchronously {
             self.lockedOverlayWidth = nil
             self.clearLiveTranscriptSession()
+            self.captureTargetApplication()
             self.liveTranscriptSessionGate.begin(context)
             self.overlayState.recordingTriggerMode = mode
             self.overlayState.isCommandMode = isCommandMode
@@ -185,6 +351,7 @@ final class RecordingOverlayManager {
         DispatchQueue.main.async {
             self.lockedOverlayWidth = nil
             self.clearLiveTranscriptSession()
+            self.captureTargetApplication()
             self.overlayState.recordingTriggerMode = mode
             self.overlayState.isCommandMode = isCommandMode
             self.overlayState.phase = .initializing
@@ -197,6 +364,7 @@ final class RecordingOverlayManager {
         DispatchQueue.main.async {
             self.lockedOverlayWidth = nil
             self.clearLiveTranscriptSession()
+            self.captureTargetApplication()
             self.overlayState.recordingTriggerMode = mode
             self.overlayState.isCommandMode = isCommandMode
             self.overlayState.phase = .recording
@@ -344,7 +512,15 @@ final class RecordingOverlayManager {
 
         guard let screen = targetScreen else { return }
 
-        let hiddenFrame = NSRect(x: frame.origin.x, y: screen.frame.maxY, width: frame.width, height: frame.height)
+        let hiddenY = usesBottomListeningCard
+            ? screen.frame.minY - frame.height
+            : screen.frame.maxY
+        let hiddenFrame = NSRect(
+            x: frame.origin.x,
+            y: hiddenY,
+            width: frame.width,
+            height: frame.height
+        )
         panel.setFrame(hiddenFrame, display: true)
         panel.alphaValue = 1
         panel.orderFrontRegardless()
@@ -369,7 +545,9 @@ final class RecordingOverlayManager {
     }
 
     private func setTranscribingPhase() {
-        if hasExpandedForLiveTranscript, let screen = targetScreen {
+        if usesBottomListeningCard, let screen = targetScreen {
+            lockedOverlayWidth = bottomCardWidth(on: screen)
+        } else if hasExpandedForLiveTranscript, let screen = targetScreen {
             lockedOverlayWidth = liveTranscriptWidth(on: screen)
         } else {
             lockedOverlayWidth = overlayWindow?.frame.width ?? overlayWidth
@@ -379,6 +557,28 @@ final class RecordingOverlayManager {
     }
 
     private func makeOverlayContent(frame: NSRect) -> NSView {
+        if usesBottomListeningCard {
+            let rootView = BottomListeningCardView(
+                state: overlayState,
+                showsLiveTranscript: hasExpandedForLiveTranscript,
+                onStopButtonPressed: { [weak self] in
+                    self?.onStopButtonPressed?()
+                },
+                onCancelButtonPressed: { [weak self] in
+                    self?.onCancelButtonPressed?()
+                },
+                onUpdateOverlayPressed: { [weak self] in
+                    self?.onUpdateOverlayPressed?()
+                }
+            )
+            return makeBottomCardContent(
+                width: frame.width,
+                height: frame.height,
+                showsSiriBorder: liveTranscriptSessionGate.activeContext != nil,
+                rootView: AnyView(rootView)
+            )
+        }
+
         if useWingedLayout {
             // Winged layout: notch x-range stays solid black so the cutout masks it.
             let rootView = WingedRecordingView(
@@ -396,6 +596,7 @@ final class RecordingOverlayManager {
                 width: frame.width,
                 height: frame.height,
                 cornerRadius: 14,
+                showsSiriBorder: hasExpandedForLiveTranscript,
                 rootView: AnyView(rootView)
             )
         }
@@ -404,6 +605,7 @@ final class RecordingOverlayManager {
             width: frame.width,
             height: frame.height,
             cornerRadius: screenHasNotch ? 18 : 12,
+            showsSiriBorder: hasExpandedForLiveTranscript,
             rootView: AnyView(
                 RecordingOverlayView(
                     state: overlayState,
@@ -439,13 +641,11 @@ final class RecordingOverlayManager {
         }
     }
 
-    /// True iff the overlay renders as wings flanking the notch (notched display
-    /// + use_compact_overlay on). updateAvailable and error toasts still use
-    /// the drop-down pill.
+    /// True iff the alternate menu-bar style is selected on a notched display.
+    /// Update and error states still use their compact pill presentation.
     private var useWingedLayout: Bool {
+        guard !usesBottomListeningCard else { return false }
         guard screenHasNotch else { return false }
-        let useCompact = (UserDefaults.standard.object(forKey: "use_compact_overlay") as? Bool) ?? true
-        guard useCompact else { return false }
         switch overlayState.phase {
         case .recording, .initializing, .transcribing:
             return true
@@ -464,6 +664,23 @@ final class RecordingOverlayManager {
 
     private var overlayFrame: NSRect {
         guard let screen = targetScreen else { return .zero }
+
+        if usesBottomListeningCard {
+            let isCompactPhase: Bool
+            switch overlayState.phase {
+            case .feedback, .updateAvailable:
+                isCompactPhase = true
+            case .initializing, .recording, .transcribing:
+                isCompactPhase = false
+            }
+            let width = isCompactPhase ? overlayWidth : bottomCardWidth(on: screen)
+            let height = isCompactPhase
+                ? Self.bottomCardCompactHeight
+                : Self.bottomCardHeight
+            let x = screen.visibleFrame.midX - width / 2
+            let y = screen.visibleFrame.minY + 24
+            return NSRect(x: x, y: y, width: width, height: height)
+        }
 
         if useWingedLayout {
             // Anchor to the screen's auxiliary-area boundaries of the notch;
@@ -588,6 +805,20 @@ final class RecordingOverlayManager {
         min(Self.maximumLiveTranscriptWidth, screen.visibleFrame.width - 40)
     }
 
+    private func bottomCardWidth(on screen: NSScreen) -> CGFloat {
+        min(Self.bottomCardWidth, screen.visibleFrame.width - 40)
+    }
+
+    private func captureTargetApplication() {
+        guard let application = NSWorkspace.shared.frontmostApplication else {
+            overlayState.targetApplicationName = "Current App"
+            overlayState.targetApplicationIcon = nil
+            return
+        }
+        overlayState.targetApplicationName = application.localizedName ?? "Current App"
+        overlayState.targetApplicationIcon = application.icon
+    }
+
     private func clearLiveTranscriptSession() {
         liveTranscriptSessionGate.invalidate()
         didLogFirstPanelForActiveSession = false
@@ -665,7 +896,18 @@ struct WingedRecordingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            wingsHStack
+            ZStack(alignment: .leading) {
+                wingsHStack
+
+                if showsLiveTranscript && showsLiveRecordingContent {
+                    OnSpeakOverlayBrand(
+                        audioLevel: state.audioLevel,
+                        isActive: state.phase == .recording
+                    )
+                        .padding(.leading, 14)
+                        .transition(.opacity)
+                }
+            }
                 .frame(maxWidth: .infinity)
                 .frame(height: wingsRowHeight)
 
@@ -689,22 +931,25 @@ struct WingedRecordingView: View {
                         InitializingDotsView()
                             .transition(.opacity)
                     } else if showsLiveRecordingContent {
-                        // Command-mode pencil sits directly above and centered
-                        // over the compact waveform inside the same wing
-                        // rectangle. Closes the gap between pill and winged
-                        // layouts: pill users already see a pencil during
-                        // command-mode dictation; winged users now do too.
-                        VStack(spacing: 1) {
-                            if state.isCommandMode {
-                                Image(systemName: "pencil")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.92))
-                                    .transition(.opacity)
+                        Group {
+                            if showsLiveTranscript {
+                                Color.clear
+                            } else {
+                                // Command-mode pencil sits directly above and centered
+                                // over the compact waveform inside the same wing.
+                                VStack(spacing: 1) {
+                                    if state.isCommandMode {
+                                        Image(systemName: "pencil")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(.white.opacity(0.92))
+                                            .transition(.opacity)
+                                    }
+                                    CompactWaveformView(
+                                        audioLevel: state.audioLevel,
+                                        showsActivityPulse: state.phase == .recording
+                                    )
+                                }
                             }
-                            CompactWaveformView(
-                                audioLevel: state.audioLevel,
-                                showsActivityPulse: state.phase == .recording
-                            )
                         }
                         .transition(.opacity)
                     } else {
@@ -755,57 +1000,48 @@ struct WingedRecordingView: View {
 
 // MARK: - Live Transcript Preview
 
-/// A display-only, tail-following row shared by both overlay layouts. The
-/// text keeps its intrinsic width and is clipped instead of truncated, which
-/// avoids an ellipsis glyph while keeping the newest words pinned to the
-/// logical trailing edge. The fade marks the clipped logical leading edge.
+/// A display-only, three-line viewport shared by both overlay layouts. Text
+/// wraps at the fixed overlay width and follows the newest lines with a short
+/// animated vertical scroll, avoiding the full-line horizontal jump caused by
+/// the original intrinsic-width implementation.
 struct LiveTranscriptStrip: View {
-    @Environment(\.layoutDirection) private var layoutDirection
     let text: String
 
-    private var trailingAlignment: Alignment {
-        layoutDirection == .leftToRight ? .trailing : .leading
-    }
+    private let bottomAnchor = "live-transcript-bottom"
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 11, weight: .regular))
-            .foregroundStyle(.white.opacity(0.85))
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
-            .frame(maxWidth: .infinity, alignment: trailingAlignment)
-            .frame(height: 22)
-            .clipped()
-            .mask(leadingEdgeFade)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity)
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    Text(text)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .lineSpacing(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentTransition(.interpolate)
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id(bottomAnchor)
+                }
+                .frame(maxWidth: .infinity, minHeight: 51, alignment: .top)
+            }
+            .onAppear {
+                proxy.scrollTo(bottomAnchor, anchor: .bottom)
+            }
+            .onChange(of: text) { _, _ in
+                DispatchQueue.main.async {
+                    withAnimation(.easeOut(duration: 0.22)) {
+                        proxy.scrollTo(bottomAnchor, anchor: .bottom)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
             .frame(height: RecordingOverlayManager.liveTranscriptStripHeight)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
-    }
-
-    @ViewBuilder
-    private var leadingEdgeFade: some View {
-        if layoutDirection == .leftToRight {
-            HStack(spacing: 0) {
-                LinearGradient(
-                    colors: [.clear, .white],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: 10)
-                Color.white
-            }
-        } else {
-            HStack(spacing: 0) {
-                Color.white
-                LinearGradient(
-                    colors: [.white, .clear],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: 10)
-            }
         }
     }
 }
@@ -1175,6 +1411,263 @@ struct InitializingDotsView: View {
     }
 }
 
+/// Default floating recording card positioned above the Dock. It keeps a
+/// stable footprint from shortcut acceptance through transcription so the UI
+/// never jumps when the first preview words arrive.
+private struct BottomListeningCardView: View {
+    @ObservedObject var state: RecordingOverlayState
+    let showsLiveTranscript: Bool
+    let onStopButtonPressed: () -> Void
+    let onCancelButtonPressed: () -> Void
+    let onUpdateOverlayPressed: () -> Void
+
+    @State private var isHovering = false
+
+    private var isListening: Bool {
+        state.phase == .recording
+    }
+
+    private var footerTitle: String {
+        switch state.phase {
+        case .initializing:
+            return "Preparing microphone…"
+        case .recording where state.recordingTriggerMode == .manual:
+            return "Click to send"
+        case .recording:
+            return "Release to send"
+        case .transcribing:
+            return "Finishing…"
+        case .feedback, .updateAvailable:
+            return ""
+        }
+    }
+
+    private var showsRecordingActions: Bool {
+        state.phase == .recording
+    }
+
+    var body: some View {
+        Group {
+            if state.phase == .feedback, let message = state.errorMessage {
+                ErrorOverlayView(message: message)
+                    .padding(.horizontal, 18)
+            } else if state.phase == .feedback {
+                FailureIndicatorView()
+            } else if state.phase == .updateAvailable {
+                UpdateAvailableOverlayView(onPress: onUpdateOverlayPressed)
+                    .padding(.horizontal, 18)
+            } else {
+                ZStack {
+                    cardContent
+                        .opacity(isHovering && showsRecordingActions ? 0.22 : 1)
+
+                    if isHovering && showsRecordingActions {
+                        recordingActions
+                            .transition(.opacity)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) {
+                isHovering = hovering
+            }
+        }
+        .animation(.easeInOut(duration: 0.16), value: state.phase)
+    }
+
+    private var cardContent: some View {
+        VStack(spacing: 0) {
+            header
+                .frame(height: 35)
+
+            centerContent
+                .frame(height: 43)
+
+            footer
+                .frame(height: 34)
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 7) {
+            Group {
+                if let icon = state.targetApplicationIcon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    Image(systemName: "app.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(.white.opacity(0.72))
+                }
+            }
+            .frame(width: 20, height: 20)
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+
+            Text(state.targetApplicationName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+
+            if state.isCommandMode {
+                CommandModeIndicator()
+            }
+
+            Spacer(minLength: 12)
+
+            CompactOnSpeakBrand(audioLevel: state.audioLevel, isActive: isListening)
+        }
+        .padding(.horizontal, 12)
+    }
+
+    @ViewBuilder
+    private var centerContent: some View {
+        VStack(spacing: 1) {
+            CapsuleWaveformView(
+                audioLevel: state.audioLevel,
+                isActive: isListening
+            )
+            .frame(
+                height: (showsLiveTranscript && !state.liveTranscript.isEmpty)
+                    || state.phase == .transcribing
+                    ? 14
+                    : 28
+            )
+            .padding(.horizontal, 12)
+
+            if showsLiveTranscript, !state.liveTranscript.isEmpty {
+                CompactLiveTranscriptPreview(text: state.liveTranscript)
+                    .frame(height: 28)
+                    .transition(.opacity)
+            } else if state.phase == .transcribing {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Finishing transcript…")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.52))
+                }
+                .frame(height: 28)
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: showsLiveTranscript)
+    }
+
+    private var footer: some View {
+        HStack {
+            Text(footerTitle)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.5))
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private var recordingActions: some View {
+        VStack(spacing: 0) {
+            Button {
+                isHovering = false
+                onStopButtonPressed()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("Finish recording")
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color(red: 0.24, green: 0.62, blue: 1.0))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+                .overlay(.white.opacity(0.08))
+
+            Button {
+                isHovering = false
+                onCancelButtonPressed()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "xmark.circle.fill")
+                    Text("Cancel recording")
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color(red: 1.0, green: 0.24, blue: 0.27))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 10)
+        .background(Color(red: 0.08, green: 0.08, blue: 0.09).opacity(0.96))
+    }
+}
+
+private struct CompactOnSpeakBrand: View {
+    let audioLevel: Float
+    let isActive: Bool
+
+    var body: some View {
+        HStack(spacing: 3) {
+            AnimatedOnSpeakMark(audioLevel: audioLevel, isActive: isActive, markSize: 13)
+            Text("OnSpeak")
+                .font(.system(size: 11, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(.white.opacity(0.42))
+        .fixedSize()
+    }
+}
+
+private struct CapsuleWaveformView: View {
+    let audioLevel: Float
+    let isActive: Bool
+
+    private static let capsuleCount = 32
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            HStack(spacing: 3) {
+                ForEach(0..<Self.capsuleCount, id: \.self) { index in
+                    let wave = 0.5 + 0.5 * sin(time * 7.2 - Double(index) * 0.56)
+                    let energy = min(max(Double(audioLevel) * 1.8, 0.08), 1)
+                    let height = 7 + CGFloat(wave * energy * 6)
+                    Capsule()
+                        .fill(.white.opacity(0.68 + wave * energy * 0.28))
+                        .frame(width: 4.5, height: height)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct CompactLiveTranscriptPreview: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.9))
+            .lineSpacing(1)
+            .lineLimit(2)
+            .truncationMode(.head)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .contentTransition(.interpolate)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 struct RecordingOverlayView: View {
     @ObservedObject var state: RecordingOverlayState
     let contentRowHeight: CGFloat
@@ -1212,11 +1705,20 @@ struct RecordingOverlayView: View {
                                 InitializingDotsView()
                                     .transition(.opacity)
                             } else if showsLiveRecordingContent {
-                                WaveformView(
-                                    audioLevel: state.audioLevel,
-                                    showsActivityPulse: state.phase == .recording
-                                )
-                                    .transition(.opacity)
+                                Group {
+                                    if showsLiveTranscript {
+                                        OnSpeakOverlayBrand(
+                                            audioLevel: state.audioLevel,
+                                            isActive: state.phase == .recording
+                                        )
+                                    } else {
+                                        WaveformView(
+                                            audioLevel: state.audioLevel,
+                                            showsActivityPulse: state.phase == .recording
+                                        )
+                                    }
+                                }
+                                .transition(.opacity)
                             } else {
                                 ProcessingIndicatorView()
                                     .transition(.opacity)
@@ -1264,6 +1766,101 @@ struct RecordingOverlayView: View {
         .animation(.spring(response: 0.28, dampingFraction: 1.0), value: state.phase)
         .animation(.spring(response: 0.28, dampingFraction: 1.0), value: state.recordingTriggerMode)
         .animation(.spring(response: 0.28, dampingFraction: 1.0), value: state.isCommandMode)
+    }
+}
+
+/// Compact listening lockup for the expanded preview. The real app mark owns
+/// the motion, so a separate waveform is unnecessary.
+private struct OnSpeakOverlayBrand: View {
+    let audioLevel: Float
+    let isActive: Bool
+
+    var body: some View {
+        HStack(spacing: 5) {
+            AnimatedOnSpeakMark(audioLevel: audioLevel, isActive: isActive)
+
+            Text("OnSpeak")
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(.white.opacity(0.82))
+        .fixedSize(horizontal: true, vertical: true)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("OnSpeak")
+    }
+}
+
+/// Draws the OnSpeak mark as a continuous fluid wave. The line flows through
+/// the fixed logo footprint instead of moving the vector as a whole, keeping
+/// the brand stable while still communicating live listening activity.
+private struct AnimatedOnSpeakMark: View {
+    let audioLevel: Float
+    let isActive: Bool
+    var markSize: CGFloat = 19
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !isActive)) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            let phase = isActive ? time * 4.5 : 0
+            FluidOnSpeakMarkShape(
+                phase: phase,
+                energy: CGFloat(max(0.18, min(audioLevel, 1)))
+            )
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.28, green: 0.72, blue: 1.0),
+                            Color(red: 0.58, green: 0.38, blue: 1.0),
+                            Color(red: 0.96, green: 0.35, blue: 0.72),
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    style: StrokeStyle(
+                        lineWidth: markSize < 16 ? 1.55 : 2.0,
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
+                )
+                .frame(width: markSize, height: markSize * 0.72)
+        }
+        .frame(width: markSize + 3, height: markSize + 3)
+    }
+}
+
+private struct FluidOnSpeakMarkShape: Shape {
+    var phase: Double
+    var energy: CGFloat
+
+    var animatableData: AnimatablePair<Double, CGFloat> {
+        get { AnimatablePair(phase, energy) }
+        set {
+            phase = newValue.first
+            energy = newValue.second
+        }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let middleY = rect.midY
+        let samplePoints = 48
+
+        for index in 0...samplePoints {
+            let progress = CGFloat(index) / CGFloat(samplePoints)
+            let x = rect.minX + progress * rect.width
+            let envelope = sin(progress * .pi)
+            let wave = sin(Double(progress) * .pi * 3.5 - phase)
+            let amplitude = rect.height * (0.28 + energy * 0.18)
+            let y = middleY + CGFloat(wave) * amplitude * envelope
+
+            if index == 0 {
+                path.move(to: CGPoint(x: x, y: y))
+            } else {
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+
+        return path
     }
 }
 

@@ -95,7 +95,7 @@ struct SetupView: View {
     @State private var isCapturingHoldShortcut = false
     @State private var isCapturingCopyAgainShortcut = false
     @StateObject private var testHotkeyHarness = SetupTestHotkeyHarness()
-    @AppStorage("use_compact_overlay") private var useCompactOverlay = true
+    @AppStorage("use_bottom_listening_card") private var useBottomListeningCard = true
 
     private let totalSteps: [SetupStep] = SetupStep.allCases
     private var isCapturingShortcut: Bool {
@@ -650,16 +650,16 @@ struct SetupView: View {
 
             VStack(spacing: 10) {
                 OverlayStyleOptionRow(
-                    title: "Minimalist menu-bar overlay",
-                    subtitle: "Two slim wings flank the camera notch and stay inside the menu bar. Never covers app tabs or toolbars.",
+                    title: "Bottom listening card",
+                    subtitle: "A floating live-transcript card above the Dock. Larger, steadier, and easier to read while speaking.",
                     isMinimalist: true,
-                    selection: $useCompactOverlay
+                    selection: $useBottomListeningCard
                 )
                 OverlayStyleOptionRow(
-                    title: "Drop-down pill",
-                    subtitle: "Single pill hangs below the menu bar during recording. Larger and more visible, but covers a thin strip of whatever app is active.",
+                    title: "Menu-bar notch",
+                    subtitle: "Keep the recording overlay attached to the top menu bar and camera notch.",
                     isMinimalist: false,
-                    selection: $useCompactOverlay
+                    selection: $useBottomListeningCard
                 )
             }
             .padding(.top, 6)
@@ -1194,36 +1194,36 @@ struct OverlayStylePreview: View {
 
             // Style-specific overlay rendering.
             if isMinimalist {
-                // Two slim wings flanking the notch, inside menu bar height.
-                HStack(spacing: notchWidth) {
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: 0,
-                        bottomLeadingRadius: 3,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: 0
-                    )
-                    .fill(Color.black)
-                    .frame(width: 16, height: notchHeight)
-
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: 0,
-                        bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 3,
-                        topTrailingRadius: 0
-                    )
-                    .fill(Color.black)
-                    .frame(width: 16, height: notchHeight)
+                // Floating listening card above the bottom edge.
+                VStack {
+                    Spacer()
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.black)
+                        .overlay(
+                            VStack(alignment: .leading, spacing: 3) {
+                                Capsule()
+                                    .fill(Color.white.opacity(0.8))
+                                    .frame(width: 20, height: 2)
+                                Capsule()
+                                    .fill(Color.white.opacity(0.35))
+                                    .frame(width: 45, height: 2)
+                            }
+                            .padding(5),
+                            alignment: .leading
+                        )
+                        .frame(width: 68, height: 24)
+                        .padding(.bottom, 5)
                 }
             } else {
-                // Drop-down pill hanging below the menu bar from the notch.
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 0,
-                    bottomLeadingRadius: 5,
-                    bottomTrailingRadius: 5,
-                    topTrailingRadius: 0
-                )
-                .fill(Color.black)
-                .frame(width: notchWidth + 10, height: notchHeight + 12)
+                // Two slim wings flanking the camera notch.
+                HStack(spacing: notchWidth) {
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(width: 16, height: notchHeight)
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(width: 16, height: notchHeight)
+                }
             }
         }
         .frame(width: frameWidth, height: frameHeight)

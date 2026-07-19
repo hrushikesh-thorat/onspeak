@@ -816,6 +816,11 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 self?.handleOverlayStopButtonPressed()
             }
         }
+        overlayManager.onCancelButtonPressed = { [weak self] in
+            DispatchQueue.main.async {
+                self?.handleOverlayCancelButtonPressed()
+            }
+        }
         // Clear any stale recording flag left over from an unclean exit.
         AppState.writeRecordingStateFlag(false)
     }
@@ -1699,8 +1704,41 @@ final class AppState: ObservableObject, @unchecked Sendable {
     }
 
     private func handleOverlayStopButtonPressed() {
-        guard isRecording, activeRecordingTriggerMode == .manual else { return }
+        guard isRecording else { return }
         stopAndTranscribe()
+    }
+
+    private func handleOverlayCancelButtonPressed() {
+        if isTranscribing {
+            cancelTranscription()
+            return
+        }
+
+        guard isRecording || activeRecordingTriggerMode != nil else { return }
+        cancelPendingShortcutStart()
+        audioRecorder.onRecordingReady = nil
+        audioRecorder.onRecordingFailure = nil
+        audioLevelCancellable?.cancel()
+        audioLevelCancellable = nil
+        contextCaptureTask?.cancel()
+        contextCaptureTask = nil
+        capturedContext = nil
+        tearDownNativeStreamingSession()
+        audioRecorder.cancelRecording()
+        restoreAudioInterruptionIfNeeded()
+        shortcutSessionController.reset()
+        activeRecordingTriggerMode = nil
+        currentSessionIntent = .dictation
+        isRecording = false
+        isTranscribing = false
+        errorMessage = nil
+        debugStatusMessage = "Cancelled"
+        statusText = "Cancelled"
+        activeRecordingSessionContext = nil
+        overlayManager.dismiss()
+        endCriticalDictationActivity()
+        refreshAvailableMicrophonesIfNeeded()
+        scheduleReadyStatusReset(after: 2, matching: ["Cancelled"])
     }
 
     private func cancelTranscription() {
