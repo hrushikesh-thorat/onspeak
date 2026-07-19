@@ -1519,7 +1519,7 @@ private struct BottomListeningCardView: View {
 
             Spacer(minLength: 12)
 
-            CompactOnSpeakBrand(audioLevel: state.audioLevel, isActive: isListening)
+            CompactOnSpeakBrand()
         }
         .padding(.horizontal, 12)
     }
@@ -1609,12 +1609,9 @@ private struct BottomListeningCardView: View {
 }
 
 private struct CompactOnSpeakBrand: View {
-    let audioLevel: Float
-    let isActive: Bool
-
     var body: some View {
         HStack(spacing: 3) {
-            AnimatedOnSpeakMark(audioLevel: audioLevel, isActive: isActive, markSize: 13)
+            StaticOnSpeakMark(markSize: 13)
             Text("OnSpeak")
                 .font(.system(size: 11, weight: .semibold))
                 .lineLimit(1)
@@ -1777,7 +1774,7 @@ private struct OnSpeakOverlayBrand: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            AnimatedOnSpeakMark(audioLevel: audioLevel, isActive: isActive)
+            StaticOnSpeakMark(markSize: 15)
 
             Text("OnSpeak")
                 .font(.system(size: 13, weight: .semibold))
@@ -1790,77 +1787,19 @@ private struct OnSpeakOverlayBrand: View {
     }
 }
 
-/// Draws the OnSpeak mark as a continuous fluid wave. The line flows through
-/// the fixed logo footprint instead of moving the vector as a whole, keeping
-/// the brand stable while still communicating live listening activity.
-private struct AnimatedOnSpeakMark: View {
-    let audioLevel: Float
-    let isActive: Bool
-    var markSize: CGFloat = 19
+/// The exact OnSpeak template mark, kept still and optically matched to the
+/// adjacent wordmark instead of acting as a second activity indicator.
+private struct StaticOnSpeakMark: View {
+    let markSize: CGFloat
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !isActive)) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
-            let phase = isActive ? time * 4.5 : 0
-            FluidOnSpeakMarkShape(
-                phase: phase,
-                energy: CGFloat(max(0.18, min(audioLevel, 1)))
-            )
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.28, green: 0.72, blue: 1.0),
-                            Color(red: 0.58, green: 0.38, blue: 1.0),
-                            Color(red: 0.96, green: 0.35, blue: 0.72),
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    style: StrokeStyle(
-                        lineWidth: markSize < 16 ? 1.55 : 2.0,
-                        lineCap: .round,
-                        lineJoin: .round
-                    )
-                )
-                .frame(width: markSize, height: markSize * 0.72)
-        }
-        .frame(width: markSize + 3, height: markSize + 3)
-    }
-}
-
-private struct FluidOnSpeakMarkShape: Shape {
-    var phase: Double
-    var energy: CGFloat
-
-    var animatableData: AnimatablePair<Double, CGFloat> {
-        get { AnimatablePair(phase, energy) }
-        set {
-            phase = newValue.first
-            energy = newValue.second
-        }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let middleY = rect.midY
-        let samplePoints = 48
-
-        for index in 0...samplePoints {
-            let progress = CGFloat(index) / CGFloat(samplePoints)
-            let x = rect.minX + progress * rect.width
-            let envelope = sin(progress * .pi)
-            let wave = sin(Double(progress) * .pi * 3.5 - phase)
-            let amplitude = rect.height * (0.28 + energy * 0.18)
-            let y = middleY + CGFloat(wave) * amplitude * envelope
-
-            if index == 0 {
-                path.move(to: CGPoint(x: x, y: y))
-            } else {
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
-        }
-
-        return path
+        Image(nsImage: OnSpeakMenuBarIcon.templateImage)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: markSize, height: markSize)
+            .foregroundStyle(.white)
+            .accessibilityHidden(true)
     }
 }
 
