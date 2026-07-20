@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://rushi-is-a.live/sitemap.xml
+Sitemap: https://hrushikesh-thorat.github.io/OnSpeak/sitemap.xml
