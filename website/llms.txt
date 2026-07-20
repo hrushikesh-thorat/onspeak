@@ -2,7 +2,7 @@
 
 OnSpeak is a free and open source macOS dictation app.
 
-Canonical site: https://rushi-is-a.live/
+Canonical site: https://hrushikesh-thorat.github.io/OnSpeak/
 Source code: https://github.com/hrushikesh-thorat/OnSpeak
 Download: https://github.com/hrushikesh-thorat/OnSpeak/releases/latest/download/OnSpeak.dmg
 License: MIT
