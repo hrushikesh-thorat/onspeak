@@ -12,6 +12,16 @@ jobs:
   build-and-release:
     runs-on: macos-latest
     steps:
+      - name: Verify explicit release approval
+        env:
+          APPROVED_TAG: ${{ vars.ONSPEAK_RELEASE_APPROVED_TAG }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ -z "$APPROVED_TAG" || "$APPROVED_TAG" != "$RELEASE_TAG" ]]; then
+            echo "Publishing is blocked. Set the ONSPEAK_RELEASE_APPROVED_TAG repository variable to $RELEASE_TAG only after explicit approval." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
