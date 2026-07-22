@@ -3,168 +3,74 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>OnSpeak - Free Open Source Mac Dictation</title>
-    <meta name="description" content="OnSpeak is a free, open source macOS dictation app with on-device Apple SpeechAnalyzer transcription, fast local cleanup, and customizable shortcuts.">
+    <title>OnSpeak — Private Dictation for Mac</title>
+    <meta name="description" content="OnSpeak is a free, open-source macOS dictation app with on-device transcription and local cleanup.">
     <meta name="robots" content="index,follow,max-image-preview:large">
     <meta name="author" content="OnSpeak">
     <meta name="application-name" content="OnSpeak">
-    <meta name="apple-mobile-web-app-title" content="OnSpeak">
-    <meta name="theme-color" content="#0b0c20">
-    <meta name="color-scheme" content="dark light">
-    <meta name="keywords" content="OnSpeak, Mac dictation app, open source dictation, speech to text Mac, on-device transcription, SpeechAnalyzer, Wispr Flow alternative, Superwhisper alternative, Monologue alternative">
-    <meta name="ai-summary" content="OnSpeak is a free open source macOS dictation app. It uses Apple SpeechAnalyzer on-device, supports customizable hold-to-talk and tap-to-toggle shortcuts, local cleanup, custom vocabulary, voice macros, and has no OnSpeak server.">
+    <meta name="theme-color" content="#000000">
+    <meta name="color-scheme" content="dark">
     <link rel="canonical" href="https://hrushikesh-thorat.github.io/OnSpeak/">
     <link rel="icon" href="assets/app-icon.png" type="image/png">
     <link rel="apple-touch-icon" href="assets/app-icon.png">
-    <link rel="preload" href="assets/demo.gif" as="image">
     <link rel="license" href="https://github.com/hrushikesh-thorat/OnSpeak/blob/main/LICENSE">
-    <link rel="help" href="https://github.com/hrushikesh-thorat/OnSpeak#readme">
     <link rel="alternate" type="text/plain" href="llms.txt" title="OnSpeak information for AI agents">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="OnSpeak">
-    <meta property="og:title" content="OnSpeak - Free Open Source Mac Dictation">
-    <meta property="og:description" content="A free and open source Mac alternative to Wispr Flow, Superwhisper, and Monologue. Dictate into any text field with on-device transcription and local cleanup.">
+    <meta property="og:title" content="OnSpeak — Private Dictation for Mac">
+    <meta property="og:description" content="Speak naturally. OnSpeak transcribes, cleans, and pastes your words without sending them to an OnSpeak server.">
     <meta property="og:image" content="https://hrushikesh-thorat.github.io/OnSpeak/assets/app-icon.png">
     <meta property="og:image:alt" content="OnSpeak app icon">
     <meta property="og:url" content="https://hrushikesh-thorat.github.io/OnSpeak/">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="OnSpeak - Free Open Source Mac Dictation">
-    <meta name="twitter:description" content="Free open source Mac dictation with hold-to-talk, on-device Apple SpeechAnalyzer transcription, custom vocabulary, and no OnSpeak server.">
+    <meta name="twitter:title" content="OnSpeak — Private Dictation for Mac">
+    <meta name="twitter:description" content="Free, open-source, on-device dictation for macOS.">
     <meta name="twitter:image" content="https://hrushikesh-thorat.github.io/OnSpeak/assets/app-icon.png">
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "WebSite",
-            "@id": "https://hrushikesh-thorat.github.io/OnSpeak/#website",
-            "name": "OnSpeak",
-            "url": "https://hrushikesh-thorat.github.io/OnSpeak/",
-            "description": "Free and open source macOS dictation app.",
-            "inLanguage": "en"
-          },
-          {
-            "@type": "WebPage",
-            "@id": "https://hrushikesh-thorat.github.io/OnSpeak/#webpage",
-            "url": "https://hrushikesh-thorat.github.io/OnSpeak/",
-            "name": "OnSpeak - Free Open Source Mac Dictation",
-            "description": "OnSpeak is a free, open source Mac dictation app with hold-to-talk shortcuts, on-device transcription, local cleanup, custom vocabulary, and voice macros.",
-            "isPartOf": {
-              "@id": "https://hrushikesh-thorat.github.io/OnSpeak/#website"
-            },
-            "about": {
-              "@id": "https://hrushikesh-thorat.github.io/OnSpeak/#software"
-            },
-            "inLanguage": "en"
-          },
-          {
-            "@type": "SoftwareApplication",
-            "@id": "https://hrushikesh-thorat.github.io/OnSpeak/#software",
-            "name": "OnSpeak",
-            "url": "https://hrushikesh-thorat.github.io/OnSpeak/",
-            "alternateName": "OnSpeak Dictation",
-            "description": "OnSpeak is a free and open source macOS dictation app with customizable shortcuts, on-device Apple SpeechAnalyzer transcription, local cleanup, custom vocabulary, and voice macros.",
-            "applicationCategory": "ProductivityApplication",
-            "operatingSystem": "macOS",
-            "softwareRequirements": "macOS 26 on supported hardware",
-            "isAccessibleForFree": true,
-            "downloadUrl": "https://github.com/hrushikesh-thorat/OnSpeak/releases/latest/download/OnSpeak.dmg",
-            "installUrl": "https://github.com/hrushikesh-thorat/OnSpeak/releases/latest/download/OnSpeak.dmg",
-            "codeRepository": "https://github.com/hrushikesh-thorat/OnSpeak",
-            "license": "https://github.com/hrushikesh-thorat/OnSpeak/blob/main/LICENSE",
-            "image": "https://hrushikesh-thorat.github.io/OnSpeak/assets/app-icon.png",
-            "offers": {
-              "@type": "Offer",
-              "price": "0",
-              "priceCurrency": "USD"
-            },
-            "featureList": [
-              "Hold-to-talk and tap-to-toggle dictation shortcuts",
-              "On-device Apple SpeechAnalyzer transcription",
-              "Deterministic local transcript cleanup",
-              "Custom vocabulary",
-              "Voice macros",
-              "No OnSpeak server"
-            ],
-            "sameAs": [
-              "https://github.com/hrushikesh-thorat/OnSpeak"
-            ]
-          },
-          {
-            "@type": "HowTo",
-            "@id": "https://hrushikesh-thorat.github.io/OnSpeak/#quick-start",
-            "name": "How to start using OnSpeak",
-            "step": [
-              {
-                "@type": "HowToStep",
-                "name": "Download OnSpeak",
-                "text": "Download the OnSpeak DMG for Mac.",
-                "url": "https://github.com/hrushikesh-thorat/OnSpeak/releases/latest/download/OnSpeak.dmg"
-              },
-              {
-                "@type": "HowToStep",
-                "name": "Grant permissions",
-                "text": "Grant Microphone, Speech Recognition, Accessibility, and Input Monitoring access."
-              },
-              {
-                "@type": "HowToStep",
-                "name": "Dictate into a text field",
-                "text": "Hold Fn to talk, or tap Command-Fn to start and stop dictation. OnSpeak pastes the cleaned text into the current text field."
-              }
-            ]
-          },
-          {
-            "@type": "FAQPage",
-            "@id": "https://hrushikesh-thorat.github.io/OnSpeak/#faq",
-            "mainEntity": [
-              {
-                "@type": "Question",
-                "name": "Does transcription leave my Mac?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "No. OnSpeak transcribes with Apple's SpeechAnalyzer and cleans the transcript locally."
-                }
-              },
-              {
-                "@type": "Question",
-                "name": "Does OnSpeak store my data?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "There is no OnSpeak server. Audio transcription and cleanup run locally on the Mac."
-                }
-              },
-              {
-                "@type": "Question",
-                "name": "Can I customize OnSpeak?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "Yes. OnSpeak supports custom dictation shortcuts, custom vocabulary, voice macros, clipboard behavior, and recording overlay preferences."
-                }
-              }
-            ]
-          }
-        ]
+        "@type": "SoftwareApplication",
+        "name": "OnSpeak",
+        "url": "https://hrushikesh-thorat.github.io/OnSpeak/",
+        "description": "Free, open-source macOS dictation with on-device transcription and local cleanup.",
+        "applicationCategory": "ProductivityApplication",
+        "operatingSystem": "macOS 26 or later",
+        "isAccessibleForFree": true,
+        "codeRepository": "https://github.com/hrushikesh-thorat/OnSpeak",
+        "license": "https://github.com/hrushikesh-thorat/OnSpeak/blob/main/LICENSE",
+        "image": "https://hrushikesh-thorat.github.io/OnSpeak/assets/app-icon.png",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
       }
     </script>
     <style>
       :root {
-        --ink: #090b15;
-        --muted: #4f5160;
-        --purple: #6c4df6;
-        --purple-2: #9b74ff;
-        --line: #e6e7ec;
+        --black: #000;
+        --near-black: #0a0a0a;
+        --white: #fff;
+        --soft-white: #d8d8d8;
+        --muted: #929292;
+        --line: #292929;
+        --max-width: 1080px;
       }
 
       * {
         box-sizing: border-box;
       }
 
+      html {
+        scroll-behavior: smooth;
+      }
+
       body {
         margin: 0;
-        color: var(--ink);
-        background: #fafafa;
+        color: var(--white);
+        background: var(--black);
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", sans-serif;
-        letter-spacing: 0;
+        -webkit-font-smoothing: antialiased;
       }
 
       a {
@@ -172,31 +78,13 @@
         text-decoration: none;
       }
 
-      .hero {
-        position: relative;
-        min-height: 574px;
-        overflow: hidden;
-        color: white;
-        background:
-          radial-gradient(circle at 83% 20%, rgba(94, 68, 235, .42), transparent 31%),
-          radial-gradient(circle at 76% 100%, rgba(86, 73, 196, .42), transparent 31%),
-          radial-gradient(circle at 12% 51%, rgba(39, 59, 120, .22), transparent 34%),
-          linear-gradient(116deg, #030814 0%, #070b18 45%, #0b0c20 100%);
-      }
-
-      .hero::after {
-        content: "";
-        position: absolute;
-        inset: auto 0 0;
-        height: 150px;
-        background: linear-gradient(to bottom, transparent, rgba(32, 38, 76, .38));
-        pointer-events: none;
+      button,
+      code {
+        font: inherit;
       }
 
       .container {
-        position: relative;
-        z-index: 1;
-        width: min(950px, calc(100% - 48px));
+        width: min(var(--max-width), calc(100% - 48px));
         margin: 0 auto;
       }
 
@@ -204,828 +92,509 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        height: 100px;
+        min-height: 104px;
+        border-bottom: 1px solid var(--line);
       }
 
       .brand {
         display: inline-flex;
         align-items: center;
-        gap: 16px;
-        font-size: 31px;
-        font-weight: 760;
+        gap: 14px;
+        font-size: 24px;
+        font-weight: 720;
+        letter-spacing: -0.03em;
       }
 
-      .app-icon {
-        width: 52px;
-        height: 52px;
-        border-radius: 14px;
-        box-shadow: 0 18px 42px rgba(101, 68, 255, .34);
+      .brand img {
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
       }
 
-      .nav {
-        display: flex;
+      .github-link {
+        display: inline-flex;
         align-items: center;
-        gap: 12px;
-        color: rgba(255, 255, 255, .92);
+        gap: 7px;
+        color: var(--soft-white);
         font-size: 15px;
-        font-weight: 500;
+        font-weight: 600;
       }
 
-      .external {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
+      .github-link:hover,
+      .github-link:focus-visible {
+        color: var(--white);
       }
 
-      .external svg {
-        width: 14px;
-        height: 14px;
-      }
-
-      .star-count {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        min-height: 32px;
-        padding: 0 11px;
-        border: 1px solid rgba(255,255,255,.16);
-        border-radius: 16px;
-        background: rgba(255,255,255,.07);
-        color: rgba(255,255,255,.88);
-        font-size: 13px;
-        font-weight: 700;
-        white-space: nowrap;
-      }
-
-      .star-count svg {
-        width: 14px;
-        height: 14px;
-        color: #a98cff;
-      }
-
-      .hero-grid {
-        display: grid;
-        grid-template-columns: 430px 1fr;
-        gap: 54px;
-        align-items: start;
-        padding-top: 26px;
-      }
-
-      .hero-copy {
-        display: contents;
-      }
-
-      .hero-main {
-        grid-column: 1;
-      }
-
-      h1 {
-        margin: 0;
-        font-size: 84px;
-        line-height: .95;
-        font-weight: 820;
-        letter-spacing: 0;
-      }
-
-      .tagline {
-        margin: 24px 0 29px;
-        max-width: 438px;
-        color: rgba(255, 255, 255, .76);
-        font-size: 22.5px;
-        line-height: 1.34;
-        font-weight: 440;
-      }
-
-      .download {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 13px;
-        width: 388px;
-        height: 75px;
-        border-radius: 16px;
-        color: white;
-        background:
-          radial-gradient(circle at 23% 0%, rgba(255,255,255,.36), transparent 28%),
-          linear-gradient(135deg, #744dff 0%, #9c72ff 48%, #6744ef 100%);
-        box-shadow: 0 24px 65px rgba(96, 74, 255, .34), inset 0 1px 0 rgba(255,255,255,.25);
-        font-size: 21px;
-        font-weight: 760;
-      }
-
-      .download svg {
-        flex: 0 0 auto;
-      }
-
-      .compat {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 28px;
-        color: rgba(255, 255, 255, .88);
-        font-size: 15px;
-      }
-
-      .chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        height: 35px;
-        padding: 0 10px;
-        border: 1px solid rgba(255, 255, 255, .42);
-        border-radius: 9px;
-        color: white;
-        font-size: 14px;
-        font-weight: 650;
-      }
-
-      .chip svg {
+      .github-link svg {
         width: 16px;
         height: 16px;
       }
 
-      .credit {
-        grid-column: 1;
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        margin-top: -30px;
-        color: rgba(255,255,255,.68);
-        font-size: 15px;
+      .hero {
+        padding: 116px 0 104px;
       }
 
-      .credit svg {
-        width: 18px;
-        height: 18px;
+      .eyebrow {
+        margin: 0 0 24px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 650;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
       }
 
-      .credit a {
-        color: #9c7cff;
+      h1 {
+        max-width: 900px;
+        margin: 0;
+        font-size: clamp(62px, 10vw, 132px);
+        font-weight: 760;
+        letter-spacing: -0.075em;
+        line-height: 0.86;
       }
 
-      .hero-visual {
-        grid-column: 2;
-        grid-row: 1 / span 2;
-        padding-top: 7px;
+      .hero-copy {
+        max-width: 700px;
+        margin: 40px 0 54px;
+        color: var(--soft-white);
+        font-size: clamp(21px, 2.8vw, 32px);
+        letter-spacing: -0.025em;
+        line-height: 1.32;
       }
 
-      .hero-demo {
-        width: 466px;
+      .installer {
+        max-width: 940px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--near-black);
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,.28);
-        border-radius: 13px;
-        background:
-          radial-gradient(circle at 78% 21%, rgba(122, 85, 255, .2), transparent 28%),
-          linear-gradient(145deg, rgba(45,47,65,.92), rgba(25,28,44,.92));
-        box-shadow: 0 32px 84px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08);
-        backdrop-filter: blur(18px);
       }
 
-      .traffic {
-        display: flex;
-        gap: 10px;
-        padding: 14px 0 0 13px;
-      }
-
-      .dot {
-        width: 13px;
-        height: 13px;
-        border-radius: 50%;
-      }
-
-      .red { background: #ff5f57; }
-      .yellow { background: #ffbd2e; }
-      .green { background: #28c840; }
-
-      .demo-media {
-        position: relative;
-        margin: 13px;
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,.12);
-        border-radius: 9px;
-        background:
-          linear-gradient(145deg, rgba(255,255,255,.1), rgba(255,255,255,.03));
-        aspect-ratio: 600 / 327;
-        box-shadow: 0 18px 42px rgba(0,0,0,.2);
-      }
-
-      .demo-media img {
-        display: block;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-
-      .hero-demo-footer {
+      .installer-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
-        padding: 0 18px 16px;
-        color: rgba(255,255,255,.78);
+        gap: 20px;
+        padding: 14px 16px 14px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .installer-label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .copy-button {
+        min-width: 84px;
+        padding: 9px 14px;
+        border: 1px solid var(--white);
+        border-radius: 999px;
+        color: var(--black);
+        background: var(--white);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .copy-button:hover,
+      .copy-button:focus-visible {
+        color: var(--white);
+        background: var(--black);
+      }
+
+      .command-wrap {
+        overflow-x: auto;
+        padding: 24px 20px 27px;
+      }
+
+      .command-wrap pre {
+        margin: 0;
+      }
+
+      .command-wrap code {
+        color: var(--white);
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 14px;
+        line-height: 1.65;
+        white-space: pre;
+      }
+
+      .requirements {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 22px;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .section {
+        padding: 92px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .section-heading {
+        max-width: 630px;
+        margin: 0 0 52px;
+        font-size: clamp(36px, 5vw, 62px);
+        font-weight: 720;
+        letter-spacing: -0.055em;
+        line-height: 1;
+      }
+
+      .facts {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .fact {
+        min-height: 240px;
+        padding: 28px 28px 28px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .fact + .fact {
+        padding-left: 28px;
+        border-left: 1px solid var(--line);
+      }
+
+      .fact-number {
+        display: block;
+        margin-bottom: 62px;
+        color: var(--muted);
+        font-family: "SFMono-Regular", Consolas, monospace;
         font-size: 13px;
       }
 
-      .shortcut-pills {
-        display: flex;
-        align-items: center;
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,.08);
-        border-radius: 18px;
-        background: rgba(255,255,255,.08);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+      .fact h3 {
+        margin: 0 0 12px;
+        font-size: 22px;
+        letter-spacing: -0.025em;
       }
 
-      .shortcut-pills span {
-        padding: 8px 12px;
-        white-space: nowrap;
-      }
-
-      .shortcut-pills span + span {
-        border-left: 1px solid rgba(255,255,255,.08);
-      }
-
-      .features {
-        background:
-          radial-gradient(circle at 50% -20%, rgba(105, 78, 255, .08), transparent 36%),
-          #fbfbfd;
-        border-top: 1px solid rgba(0,0,0,.08);
-      }
-
-      .feature-grid {
-        display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        min-height: 236px;
-        padding-top: 24px;
-      }
-
-      .feature {
-        min-height: 176px;
-        padding: 0 10px;
-        text-align: center;
-        border-left: 1px solid #dddfe8;
-      }
-
-      .feature:first-child {
-        border-left: 0;
-      }
-
-      .feature svg {
-        width: 44px;
-        height: 44px;
-        color: #684be6;
-        stroke-width: 1.9;
-      }
-
-      .feature h3 {
-        margin: 14px 0 8px;
+      .fact p {
+        margin: 0;
+        color: var(--muted);
         font-size: 16px;
-        line-height: 1.13;
-        font-weight: 790;
-      }
-
-      .feature p {
-        margin: 0 auto;
-        color: #434654;
-        font-size: 12px;
-        line-height: 1.28;
-      }
-
-      .quick {
-        padding: 36px 0 0;
-        background: #fbfbfd;
-      }
-
-      .quick-grid {
-        display: grid;
-        grid-template-columns: 318px 1fr;
-        gap: 45px;
-        align-items: start;
-      }
-
-      .quick h2 {
-        margin: 10px 0 22px;
-        font-size: 29px;
-        line-height: 1.08;
-        font-weight: 820;
+        line-height: 1.55;
       }
 
       .steps {
         display: grid;
-        gap: 22px;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
       }
 
       .step {
-        display: grid;
-        grid-template-columns: 28px 1fr;
-        gap: 10px;
-        color: #3d404d;
-        font-size: 14px;
-        line-height: 1.45;
+        padding-top: 22px;
+        border-top: 1px solid var(--white);
       }
 
-      .num {
-        display: grid;
-        place-items: center;
-        width: 25px;
-        height: 25px;
-        border-radius: 50%;
-        color: white;
-        background: linear-gradient(135deg, #8064ff, #5740d7);
-        font-size: 15px;
-        font-weight: 780;
-      }
-
-      .quick a,
-      .cards a {
-        color: #5f42df;
-      }
-
-      .result-panel {
-        position: relative;
-        width: 566px;
-        min-height: 254px;
-        border: 1px solid #d7d8df;
-        border-radius: 13px;
-        background:
-          linear-gradient(180deg, #ffffff, #fbfbff);
-        overflow: hidden;
-        box-shadow: 0 18px 42px rgba(21, 24, 38, .12);
-      }
-
-      .result-panel::before {
-        content: "";
-        position: absolute;
-        inset: 0 0 auto;
-        height: 36px;
-        border-bottom: 1px solid #eef0f3;
-        background: rgba(255,255,255,.86);
-      }
-
-      .result-chrome {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        height: 36px;
-        padding: 0 13px;
-      }
-
-      .result-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-      }
-
-      .result-content {
-        position: relative;
-        z-index: 1;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
-        gap: 14px;
-        align-items: start;
-        padding: 28px 24px 16px;
-      }
-
-      .result-block {
-        min-height: 134px;
-      }
-
-      .result-label {
-        display: inline-flex;
-        align-items: center;
-        height: 24px;
-        padding: 0 9px;
-        border-radius: 12px;
-        background: #f0edff;
-        color: #5f42df;
-        font-size: 12px;
-        font-weight: 750;
-      }
-
-      .result-block p {
-        margin: 14px 0 0;
-        color: #222531;
-        font-size: 14px;
-        line-height: 1.48;
-      }
-
-      .result-block p strong {
-        font-weight: 760;
-      }
-
-      .result-block.muted p {
-        color: #666a77;
-      }
-
-      .result-arrow {
-        width: 32px;
-        height: 32px;
-        margin: 53px auto 0;
-        border-radius: 50%;
-        display: grid;
-        place-items: center;
-        color: white;
-        background: linear-gradient(135deg, #8064ff, #5740d7);
-        box-shadow: 0 12px 22px rgba(91, 65, 220, .26);
-      }
-
-      .result-tags {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 0 24px 24px;
-      }
-
-      .result-tags span {
-        display: inline-flex;
-        align-items: center;
-        height: 26px;
-        padding: 0 10px;
-        border: 1px solid #e6e3f7;
-        border-radius: 13px;
-        color: #5f42df;
-        background: #faf9ff;
-        font-size: 12px;
-        font-weight: 650;
-      }
-
-      .cards {
-        padding: 51px 0 18px;
-        background: #fbfbfd;
-      }
-
-      .card-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 13px;
-      }
-
-      .card {
-        min-height: 218px;
-        padding: 23px 20px 18px;
-        border: 1px solid #dedfe7;
-        border-radius: 8px;
-        background: #fff;
-        box-shadow: 0 12px 30px rgba(28, 31, 45, .04);
-      }
-
-      .card-head {
-        display: flex;
-        align-items: center;
-        gap: 13px;
-        min-height: 29px;
-      }
-
-      .card h3 {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 780;
-      }
-
-      .card p {
-        margin: 12px 0 12px;
-        color: #4c4f5d;
-        font-size: 12.5px;
-        line-height: 1.32;
-      }
-
-      .card a {
+      .step span {
+        display: block;
+        margin-bottom: 26px;
+        color: var(--muted);
+        font-family: "SFMono-Regular", Consolas, monospace;
         font-size: 13px;
-        font-weight: 520;
       }
 
-      .card-icon {
-        display: grid;
-        place-items: center;
-        width: 33px;
-        height: 33px;
-        color: #6547e9;
-      }
-
-      .card-icon.filled {
-        border-radius: 50%;
-        color: white;
-        background: linear-gradient(135deg, #8064ff, #5740d7);
-        font-weight: 800;
+      .step h3 {
+        margin: 0 0 10px;
         font-size: 20px;
       }
 
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .roadmap-list {
+        border-top: 1px solid var(--line);
+      }
+
+      .roadmap-item {
+        display: grid;
+        grid-template-columns: 52px minmax(190px, 0.75fr) minmax(280px, 1.25fr);
+        gap: 24px;
+        align-items: start;
+        padding: 26px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .roadmap-number {
+        color: var(--muted);
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 13px;
+      }
+
+      .roadmap-item h3 {
+        margin: 0;
+        font-size: 19px;
+        letter-spacing: -0.025em;
+      }
+
+      .roadmap-item p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
       .footer {
-        padding: 0 0 14px;
-        color: #8a8d98;
-        background: #fbfbfd;
-        text-align: center;
-        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        min-height: 120px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
       }
 
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
+      .footer-links {
+        display: flex;
+        gap: 22px;
       }
 
-      @media (max-width: 860px) {
-        .hero {
-          min-height: auto;
-          padding-bottom: 44px;
+      .footer a:hover,
+      .footer a:focus-visible {
+        color: var(--white);
+      }
+
+      @media (max-width: 760px) {
+        .container {
+          width: min(var(--max-width), calc(100% - 30px));
         }
 
         .header {
-          height: 84px;
+          min-height: 84px;
         }
 
-        .nav {
-          gap: 16px;
-          font-size: 13px;
-        }
-
-        .hero-grid,
-        .quick-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .hero-main,
-        .hero-visual,
-        .credit {
-          grid-column: 1;
-        }
-
-        .hero-main {
-          order: 1;
-        }
-
-        .hero-visual {
-          grid-row: auto;
-          order: 2;
-        }
-
-        .credit {
-          order: 3;
-          margin-top: 6px;
-        }
-
-        h1 {
-          font-size: 58px;
-        }
-
-        .download,
-        .hero-demo,
-        .result-panel {
-          width: 100%;
-        }
-
-        .feature-grid,
-        .card-grid {
-          grid-template-columns: repeat(2, 1fr);
-        }
-
-        .feature:nth-child(odd) {
-          border-left: 0;
-        }
-
-        .result-content {
-          grid-template-columns: 1fr;
-        }
-
-        .result-arrow {
-          position: static;
-          transform: none;
-          margin: -4px auto;
-        }
-      }
-
-      @media (max-width: 560px) {
-        .container {
-          width: min(100% - 28px, 950px);
-        }
-
-        .brand .brand-name {
-          display: none;
-        }
-
-        .nav {
-          gap: 12px;
-        }
-
-        .hero-grid {
-          padding-top: 6px;
-        }
-
-        .tagline {
+        .brand {
           font-size: 20px;
         }
 
-        .compat {
-          flex-wrap: wrap;
+        .brand img {
+          width: 40px;
+          height: 40px;
+          border-radius: 11px;
         }
 
-        .hero-demo-footer {
-          align-items: flex-start;
-          flex-direction: column;
+        .hero {
+          padding: 82px 0 74px;
         }
 
-        .feature-grid,
-        .card-grid {
+        h1 {
+          font-size: clamp(62px, 22vw, 92px);
+        }
+
+        .hero-copy {
+          margin: 30px 0 40px;
+          font-size: 21px;
+        }
+
+        .installer-head {
+          padding-left: 16px;
+        }
+
+        .command-wrap {
+          padding: 20px 16px 23px;
+        }
+
+        .section {
+          padding: 70px 0;
+        }
+
+        .facts,
+        .steps {
           grid-template-columns: 1fr;
         }
 
-        .feature {
-          border-left: 0;
-          border-top: 1px solid var(--line);
+        .roadmap-item {
+          grid-template-columns: 34px 1fr;
+          gap: 16px;
         }
 
+        .roadmap-item p {
+          grid-column: 2;
+        }
+
+        .fact {
+          min-height: 0;
+          padding: 24px 0 30px;
+        }
+
+        .fact + .fact {
+          padding-left: 0;
+          border-left: 0;
+        }
+
+        .fact-number {
+          margin-bottom: 38px;
+        }
+
+        .step {
+          padding-bottom: 24px;
+        }
+
+        .footer {
+          align-items: flex-start;
+          flex-direction: column;
+          justify-content: center;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
       }
     </style>
   </head>
   <body>
-    <section class="hero">
-      <div class="container">
-        <header class="header">
-          <a class="brand" href="#" aria-label="OnSpeak home">
-            <img class="app-icon" src="assets/app-icon.png" width="52" height="52" alt="">
-            <span class="brand-name">OnSpeak</span>
-          </a>
-          <nav class="nav" aria-label="Primary">
-            <a class="external" href="https://github.com/hrushikesh-thorat/OnSpeak">GitHub
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg>
-            </a>
-            <span class="star-count" title="GitHub stars">
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 2 2.96 6 6.62.96-4.79 4.67 1.13 6.59L12 17.11l-5.92 3.11 1.13-6.59-4.79-4.67L9.04 8 12 2Z"/></svg>
-              <span id="github-stars" aria-live="polite">1,438 stars</span>
-            </span>
-          </nav>
-        </header>
+    <header class="container header">
+      <a class="brand" href="#top" aria-label="OnSpeak home">
+        <img src="assets/app-icon.png" width="46" height="46" alt="">
+        <span>OnSpeak</span>
+      </a>
+      <a class="github-link" href="https://github.com/hrushikesh-thorat/OnSpeak">
+        GitHub
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg>
+      </a>
+    </header>
 
-        <div class="hero-grid">
-          <div class="hero-copy">
-          <div class="hero-main">
-            <h1>OnSpeak</h1>
-            <p class="tagline">Free and open source alternative to<br>Wispr Flow, Superwhisper, and Monologue.</p>
-            <a class="download" href="https://github.com/hrushikesh-thorat/OnSpeak/releases/latest/download/OnSpeak.dmg">
-              <svg width="35" height="35" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M22.38 16.72c-.03-3.24 2.65-4.8 2.77-4.87-1.51-2.22-3.85-2.52-4.68-2.55-1.99-.2-3.88 1.17-4.89 1.17-1 0-2.55-1.14-4.2-1.11-2.16.03-4.15 1.25-5.26 3.18-2.25 3.9-.58 9.68 1.62 12.84 1.07 1.54 2.35 3.28 4.03 3.22 1.62-.06 2.23-1.04 4.18-1.04 1.96 0 2.5 1.04 4.21 1.01 1.74-.03 2.84-1.58 3.9-3.13 1.23-1.8 1.74-3.54 1.77-3.63-.04-.02-3.4-1.31-3.45-5.09ZM19.17 7.2c.89-1.08 1.49-2.58 1.32-4.08-1.28.05-2.83.85-3.75 1.93-.82.95-1.54 2.48-1.35 3.94 1.43.11 2.89-.72 3.78-1.79Z"/></svg>
-              <svg width="19" height="22" viewBox="0 0 18 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 1v16"/><path d="m2 10 7 7 7-7"/></svg>
-              <span>Download OnSpeak.dmg</span>
-            </a>
-            <div class="compat">
-              <span>Requires macOS 26 and supported hardware</span>
-              <span class="chip">
-                <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M22.38 16.72c-.03-3.24 2.65-4.8 2.77-4.87-1.51-2.22-3.85-2.52-4.68-2.55-1.99-.2-3.88 1.17-4.89 1.17-1 0-2.55-1.14-4.2-1.11-2.16.03-4.15 1.25-5.26 3.18-2.25 3.9-.58 9.68 1.62 12.84 1.07 1.54 2.35 3.28 4.03 3.22 1.62-.06 2.23-1.04 4.18-1.04 1.96 0 2.5 1.04 4.21 1.01 1.74-.03 2.84-1.58 3.9-3.13 1.23-1.8 1.74-3.54 1.77-3.63-.04-.02-3.4-1.31-3.45-5.09ZM19.17 7.2c.89-1.08 1.49-2.58 1.32-4.08-1.28.05-2.83.85-3.75 1.93-.82.95-1.54 2.48-1.35 3.94 1.43.11 2.89-.72 3.78-1.79Z"/></svg>M
-              </span>
-              <span class="chip">Intel</span>
-            </div>
-          </div>
-          </div>
+    <main id="top">
+      <section class="container hero">
+        <p class="eyebrow">On-device dictation for macOS</p>
+        <h1>Speak.<br>OnSpeak types.</h1>
+        <p class="hero-copy">Hold a shortcut, speak naturally, and release. Your words are transcribed, cleaned, and pasted where you are working.</p>
 
-          <div class="hero-visual">
-            <div class="hero-demo" id="demo" aria-label="OnSpeak demo">
-              <div class="traffic"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
-              <div class="demo-media">
-                <img src="assets/demo.gif" width="600" height="327" fetchpriority="high" alt="OnSpeak dictating text into a Mac app">
-              </div>
-              <div class="hero-demo-footer">
-                <span>Dictate into any focused text field</span>
-                <div class="shortcut-pills"><span>Hold Fn</span><span>⌘ Fn toggle</span></div>
-              </div>
-            </div>
+        <div class="installer" aria-label="Install OnSpeak">
+          <div class="installer-head">
+            <span class="installer-label">Install from Terminal</span>
+            <button class="copy-button" id="copy-command" type="button">Copy</button>
+          </div>
+          <div class="command-wrap">
+            <pre><code id="install-command">curl -L -o /tmp/OnSpeak.dmg https://github.com/hrushikesh-thorat/OnSpeak/releases/latest/download/OnSpeak.dmg &amp;&amp; xattr -c /tmp/OnSpeak.dmg &amp;&amp; hdiutil attach /tmp/OnSpeak.dmg -nobrowse -mountpoint /tmp/onspeak-dmg -quiet &amp;&amp; mkdir -p ~/Applications &amp;&amp; rm -rf ~/Applications/OnSpeak.app &amp;&amp; ditto /tmp/onspeak-dmg/OnSpeak.app ~/Applications/OnSpeak.app &amp;&amp; hdiutil detach /tmp/onspeak-dmg -quiet &amp;&amp; rm /tmp/OnSpeak.dmg &amp;&amp; open ~/Applications/OnSpeak.app</code></pre>
           </div>
         </div>
-      </div>
-    </section>
-
-    <main>
-      <section class="features" aria-label="Features">
-        <div class="container feature-grid">
-          <article class="feature">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="38" height="28" rx="4"/><path d="M12 17h1M18 17h1M24 17h1M30 17h1M36 17h1M12 24h1M18 24h1M24 24h1M30 24h1M36 24h1M14 31h20"/></svg>
-            <h3>Custom shortcuts</h3>
-            <p>Customize hold-to-talk and tap-to-toggle shortcuts, including latching from hold mode into toggle mode.</p>
-          </article>
-          <article class="feature">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 39 30 16"/><path d="m27 7 2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6ZM39 5l1.5 4.5L45 11l-4.5 1.5L39 17l-1.5-4.5L33 11l4.5-1.5L39 5ZM36 27l1.5 4.5L42 33l-4.5 1.5L36 39l-1.5-4.5L30 33l4.5-1.5L36 27Z"/></svg>
-            <h3>Local cleanup</h3>
-            <p>Removes obvious fillers, repeated words, stutter fragments, and awkward punctuation spacing without semantic rewriting.</p>
-          </article>
-          <article class="feature">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M24 15c-4-6-14-5-14 2v21c0-7 10-8 14-2 4-6 14-5 14 2V17c0-7-10-8-14-2Z"/><path d="M24 15v21"/></svg>
-            <h3>Custom vocabulary</h3>
-            <p>Add names, jargon, and project-specific words to preserve during cleanup.</p>
-          </article>
-          <article class="feature">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 36h19a8 8 0 0 0 1-15 12 12 0 0 0-23-3A9 9 0 0 0 17 36Z"/></svg>
-            <h3>On-device transcription</h3>
-            <p>Apple SpeechAnalyzer transcribes speech locally without a transcription account or API key.</p>
-          </article>
-          <article class="feature">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 34c4-8 20-8 24 0"/><path d="M17 18a7 7 0 0 1 14 0c0 4-3 7-7 7s-7-3-7-7Z"/><path d="M9 19v7M39 19v7M14 12l-3-3M34 12l3-3"/></svg>
-            <h3>Voice Macros</h3>
-            <p>Define spoken commands that paste predefined text immediately.</p>
-          </article>
-          <article class="feature" id="privacy">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="12" y="21" width="24" height="18" rx="3"/><path d="M17 21v-7a7 7 0 0 1 14 0v7"/></svg>
-            <h3>Privacy first</h3>
-            <p>No OnSpeak server. Audio transcription and cleanup run locally on your Mac.</p>
-          </article>
-        </div>
+        <p class="requirements"><span>macOS 26 or later</span><span>Free and open source</span><span>No account required</span></p>
       </section>
 
-      <section class="quick">
-        <div class="container quick-grid">
-          <div>
-            <h2>Quick Start</h2>
-            <div class="steps">
-              <div class="step"><span class="num">1</span><span>Download the app using the button at the top of this page or <a href="https://github.com/hrushikesh-thorat/OnSpeak/releases/latest/download/OnSpeak.dmg">click here</a>.</span></div>
-              <div class="step"><span class="num">2</span><span>Grant Microphone, Speech Recognition, Accessibility, and Input Monitoring access.</span></div>
-              <div class="step"><span class="num">3</span><span>Hold Fn to talk, or tap Command-Fn to start and stop dictation, and have whatever you say pasted into the current text field.</span></div>
-            </div>
-          </div>
-          <div class="result-panel" aria-label="OnSpeak cleanup example">
-            <div class="result-chrome"><span class="result-dot red"></span><span class="result-dot yellow"></span><span class="result-dot green"></span></div>
-            <div class="result-content">
-              <div class="result-block muted">
-                <span class="result-label">Raw dictation</span>
-                <p>hey um can you add uh the speech analyzer benchmark to the launch notes</p>
-              </div>
-              <div class="result-arrow" aria-hidden="true">→</div>
-              <div class="result-block">
-                <span class="result-label">Cleaned output</span>
-                <p>Hey, can you add the SpeechAnalyzer benchmark to the launch notes?</p>
-              </div>
-            </div>
-            <div class="result-tags" aria-label="Cleanup capabilities"><span>Fixes punctuation</span><span>Removes fillers</span><span>Runs locally</span></div>
+      <section class="section" aria-labelledby="why-onspeak">
+        <div class="container">
+          <h2 class="section-heading" id="why-onspeak">Your voice stays yours.</h2>
+          <div class="facts">
+            <article class="fact">
+              <span class="fact-number">01</span>
+              <h3>On-device</h3>
+              <p>Apple SpeechAnalyzer transcribes locally. OnSpeak has no hosted audio pipeline.</p>
+            </article>
+            <article class="fact">
+              <span class="fact-number">02</span>
+              <h3>Fast</h3>
+              <p>Live transcription begins while you speak, then conservative cleanup prepares the text for pasting.</p>
+            </article>
+            <article class="fact">
+              <span class="fact-number">03</span>
+              <h3>Predictable</h3>
+              <p>Custom vocabulary, Paste Again, and local cleanup help your words arrive as intended.</p>
+            </article>
           </div>
         </div>
       </section>
 
-      <section class="cards" id="faq">
-        <div class="container card-grid">
-          <article class="card">
-            <div class="card-head"><span class="card-icon filled">?</span><h3>Why SpeechAnalyzer?</h3></div>
-            <p>It provides native on-device transcription and lets OnSpeak stream audio into the analyzer while you speak.</p>
-            <a href="#faq">Learn more in the FAQ →</a>
-          </article>
-          <article class="card">
-            <div class="card-head"><span class="card-icon"><svg viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="30" height="20" rx="3"/><path d="m12 14 5 4-5 4M20 23h7"/></svg></span><h3>No account required</h3></div>
-            <p>OnSpeak has no transcription account, subscription, or hosted audio pipeline.</p>
-          </article>
-          <article class="card">
-            <div class="card-head"><span class="card-icon"><svg viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 10h26M5 18h26M5 26h26"/><circle cx="14" cy="10" r="3"/><circle cx="23" cy="18" r="3"/><circle cx="12" cy="26" r="3"/></svg></span><h3>Predictable cleanup</h3></div>
-            <p>Cleanup is deterministic and meaning-preserving, with an option to paste the transcript verbatim.</p>
-            <a href="https://github.com/hrushikesh-thorat/OnSpeak#readme">Read how it works →</a>
-          </article>
-          <article class="card">
-            <div class="card-head"><span class="card-icon"><svg viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 4 12 7v14l-12 7-12-7V11Z"/><path d="m6 11 12 7 12-7M18 18v14"/></svg></span><h3>Open source</h3></div>
-            <p>OnSpeak is and always will be free and open source, licensed under the MIT license.</p>
-            <a href="https://github.com/hrushikesh-thorat/OnSpeak">View on GitHub →</a>
-          </article>
+      <section class="section" aria-labelledby="how-it-works">
+        <div class="container">
+          <h2 class="section-heading" id="how-it-works">Three steps. Then just speak.</h2>
+          <div class="steps">
+            <article class="step">
+              <span>01</span>
+              <h3>Install</h3>
+              <p>Copy the Terminal command above and run it once.</p>
+            </article>
+            <article class="step">
+              <span>02</span>
+              <h3>Allow</h3>
+              <p>Grant Microphone, Speech Recognition, and Accessibility permissions.</p>
+            </article>
+            <article class="step">
+              <span>03</span>
+              <h3>Talk</h3>
+              <p>Hold Right Command to speak, then release to paste.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="roadmap">
+        <div class="container">
+          <h2 class="section-heading" id="roadmap">What comes next.</h2>
+          <div class="roadmap-list">
+            <article class="roadmap-item">
+              <span class="roadmap-number">01</span>
+              <h3>App-aware formatting</h3>
+              <p>Choose local formatting by app—concise messages, polished email, structured notes, or literal technical text.</p>
+            </article>
+            <article class="roadmap-item">
+              <span class="roadmap-number">02</span>
+              <h3>Writing profiles</h3>
+              <p>Switch between Natural, Message, Email, Notes, Technical, and Verbatim profiles.</p>
+            </article>
+            <article class="roadmap-item">
+              <span class="roadmap-number">03</span>
+              <h3>Spoken editing</h3>
+              <p>Create paragraphs and lists, scratch out a thought, or undo the last sentence with clear voice actions.</p>
+            </article>
+            <article class="roadmap-item">
+              <span class="roadmap-number">04</span>
+              <h3>Multilingual dictation</h3>
+              <p>Faster language switching, language-specific dictionaries, and per-app language preferences.</p>
+            </article>
+            <article class="roadmap-item">
+              <span class="roadmap-number">05</span>
+              <h3>Trusted updates</h3>
+              <p>Developer ID signing, notarization, and a verified one-click update path with safe rollback.</p>
+            </article>
+          </div>
         </div>
       </section>
     </main>
 
-    <footer class="footer">© 2026 OnSpeak. Licensed under the MIT license.</footer>
+    <footer class="container footer">
+      <span>© 2026 OnSpeak · MIT License</span>
+      <div class="footer-links">
+        <a href="https://github.com/hrushikesh-thorat/OnSpeak">Source</a>
+        <a href="https://github.com/hrushikesh-thorat/OnSpeak/releases/latest">Releases</a>
+      </div>
+    </footer>
+
     <script>
       (() => {
-        const starsEl = document.getElementById("github-stars");
-        if (!starsEl) return;
+        const button = document.getElementById("copy-command");
+        const command = document.getElementById("install-command");
+        if (!button || !command) return;
 
-        const cacheKey = "onspeak.githubStars";
-        const formatStars = (count) => {
-          if (!Number.isFinite(count)) return "Stars";
-          return count.toLocaleString();
-        };
-        const render = (count) => {
-          starsEl.textContent = `${formatStars(count)} stars`;
-        };
-
-        try {
-          const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
-          if (cached && Date.now() - cached.timestamp < 6 * 60 * 60 * 1000) {
-            render(cached.count);
+        button.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(command.textContent.trim());
+            button.textContent = "Copied";
+            window.setTimeout(() => { button.textContent = "Copy"; }, 1600);
+          } catch {
+            button.textContent = "Select command";
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(command);
+            selection.removeAllRanges();
+            selection.addRange(range);
           }
-        } catch {}
-
-        fetch("https://api.github.com/repos/hrushikesh-thorat/OnSpeak", {
-          headers: { "Accept": "application/vnd.github+json" }
-        })
-          .then((response) => response.ok ? response.json() : Promise.reject(new Error("GitHub request failed")))
-          .then((repo) => {
-            const count = Number(repo.stargazers_count);
-            if (!Number.isFinite(count)) return;
-            render(count);
-            try {
-              localStorage.setItem(cacheKey, JSON.stringify({ count, timestamp: Date.now() }));
-            } catch {}
-          })
-          .catch(() => {});
+        });
       })();
     </script>
   </body>

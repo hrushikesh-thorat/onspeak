@@ -84,6 +84,30 @@ make run
 
 The app bundle is built as `build/OnSpeak.app` with bundle identifier `com.rushatpeace.onspeak`.
 
+## Roadmap
+
+The roadmap describes the direction of the project, not committed release dates. New behavior should remain optional, preserve the current dictation path as a fallback, and avoid new permissions whenever possible.
+
+### App-aware formatting
+
+Use the active application's bundle identifier to choose an appropriate local formatting profile. Messages can stay concise, email can use polished paragraphs, notes can become structured, and technical editors can preserve literal wording. Users will be able to override or disable formatting per app. This should not require screenshots or reading document contents.
+
+### Writing profiles
+
+Add reusable profiles such as Natural, Message, Email, Notes, and Technical. Profiles can be selected manually or assigned as defaults for individual apps, while Verbatim remains available when cleanup is not wanted.
+
+### Spoken structure and editing
+
+Support explicit voice actions such as “new paragraph,” “bullet list,” “scratch that,” and “undo last sentence.” These commands should be predictable, visible in the live preview, and reversible before text is pasted.
+
+### Multilingual dictation
+
+Make language switching faster, add language-specific personal dictionaries, and allow per-app language preferences while continuing to use Apple's on-device speech capabilities.
+
+### Distribution and updates
+
+Move from ad-hoc signing to Developer ID signing and notarization, then extend update notifications into a verified one-click update flow with safe rollback.
+
 ## Origin
 
 OnSpeak was forked from [zachlatta/freeflow](https://github.com/zachlatta/freeflow) at commit [`1de2c2fec50cfa24bf988b670a7598138914a05f`](https://github.com/zachlatta/freeflow/commit/1de2c2fec50cfa24bf988b670a7598138914a05f).
