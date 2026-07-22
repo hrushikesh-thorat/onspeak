@@ -15,6 +15,7 @@ struct AppContextServiceTests {
         DictionaryStoreTests.run()
         LiveTranscriptComposerTests.run()
         LiveTranscriptSessionSupportTests.run()
+        UpdateCheckerTests.run()
         print("OnSpeakTests passed")
     }
 

@@ -8,6 +8,18 @@ This project uses semantic versioning for public releases. Use `MAJOR.MINOR.PATC
 - `MINOR` changes add user-visible features and improvements.
 - `PATCH` changes fix bugs, polish existing behavior, or make small internal improvements.
 
+## [0.6.0] - 2026-07-22
+
+### Added
+
+- OnSpeak now checks for stable updates and shows a menu-bar badge, a brief update notice, and a direct link to the matching GitHub release when a newer version is available.
+- A manual Check for Updates action is available from the menu-bar app menu.
+- New users can open the OnSpeak repository and star the project directly from the first onboarding page.
+
+### Improved
+
+- Update notices stay out of the way during setup, recording, and transcription, while the menu-bar reminder remains available until the app is updated.
+
 ## [0.5.1] - 2026-07-22
 
 ### Added

@@ -253,6 +253,12 @@ struct SetupView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Link(destination: OnSpeakLinks.repository) {
+                Label("Star OnSpeak on GitHub", systemImage: "star.fill")
+            }
+            .buttonStyle(.bordered)
+            .help("Open the OnSpeak repository on GitHub")
+
         }
     }
 

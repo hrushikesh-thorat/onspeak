@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
+    @ObservedObject private var updateChecker = UpdateChecker.shared
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -69,6 +70,26 @@ struct MenuBarView: View {
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity)
                 .background(Color.red)
+
+                Divider()
+            }
+
+            if let release = updateChecker.availableRelease {
+                Button {
+                    updateChecker.openAvailableRelease()
+                } label: {
+                    Label(
+                        "OnSpeak \(release.version) is available",
+                        systemImage: "arrow.down.circle.fill"
+                    )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(Color.blue)
 
                 Divider()
             }
@@ -291,6 +312,29 @@ struct MenuBarView: View {
 
             Button("Settings") {
                 NotificationCenter.default.post(name: .showSettings, object: nil)
+            }
+
+            Button {
+                Task {
+                    await updateChecker.checkForUpdates(userInitiated: true)
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    if updateChecker.isChecking {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(updateChecker.isChecking ? "Checking for Updates…" : "Check for Updates")
+                }
+            }
+            .disabled(updateChecker.isChecking)
+
+            if let message = updateChecker.lastCheckMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: 280, alignment: .leading)
             }
 
             Divider()

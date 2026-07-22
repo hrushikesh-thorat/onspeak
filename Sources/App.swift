@@ -21,11 +21,15 @@ struct OnSpeakApp: App {
 struct MenuBarLabel: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var notificationManager = VocabularyNotificationManager.shared
+    @ObservedObject private var updateChecker = UpdateChecker.shared
 
     var body: some View {
         HStack(spacing: 4) {
             if notificationManager.showCheckmark {
                 Image(systemName: "checkmark")
+            }
+            if updateChecker.updateAvailable {
+                Image(systemName: "arrow.down.circle.fill")
             }
             if appState.isRecording {
                 Image(systemName: "record.circle")

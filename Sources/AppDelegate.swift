@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NetworkMonitor.shared.start()
+        configureUpdateChecker()
 
         NotificationCenter.default.addObserver(
             self,
@@ -26,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             appState.startHotkeyMonitoring()
             appState.startAccessibilityPolling()
+            UpdateChecker.shared.startAutomaticChecks()
             if !AXIsProcessTrusted() {
                 appState.showAccessibilityAlert()
             }
@@ -135,7 +137,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
 
         let setupView = SetupView(onComplete: { [weak self] in
-            self?.completeSetup()
+            Task { @MainActor in
+                self?.completeSetup()
+            }
         })
         .environmentObject(appState)
 
@@ -158,6 +162,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    @MainActor
     func completeSetup() {
         appState.hasCompletedSetup = true
         setupWindow?.close()
@@ -165,8 +170,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         appState.startHotkeyMonitoring()
         appState.startAccessibilityPolling()
+        UpdateChecker.shared.startAutomaticChecks()
         if !AXIsProcessTrusted() {
             appState.showAccessibilityAlert()
+        }
+    }
+
+    @MainActor
+    private func configureUpdateChecker() {
+        UpdateChecker.shared.onAutomaticUpdateAvailable = { [weak self] release in
+            guard let self,
+                  self.appState.hasCompletedSetup,
+                  !self.appState.isRecording,
+                  !self.appState.isTranscribing else {
+                return false
+            }
+
+            self.appState.overlayManager.showUpdateAvailable(version: release.version)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+                self?.appState.overlayManager.dismissUpdateAvailable(version: release.version)
+            }
+            return true
+        }
+
+        appState.overlayManager.onUpdateOverlayPressed = { [weak self] in
+            Task { @MainActor in
+                self?.appState.overlayManager.dismiss()
+                UpdateChecker.shared.openAvailableRelease()
+            }
         }
     }
 }

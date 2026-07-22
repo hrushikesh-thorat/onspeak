@@ -564,6 +564,16 @@ final class RecordingOverlayManager {
         }
     }
 
+    func dismissUpdateAvailable(version: String) {
+        DispatchQueue.main.async {
+            guard self.overlayState.phase == .updateAvailable,
+                  self.overlayState.updateVersion == version else {
+                return
+            }
+            self.dismissAll()
+        }
+    }
+
     func dismiss() {
         performOnMainSynchronously {
             self.dismissAll()
@@ -1533,7 +1543,10 @@ private struct BottomListeningCardView: View {
             } else if state.phase == .feedback {
                 FailureIndicatorView()
             } else if state.phase == .updateAvailable {
-                UpdateAvailableOverlayView(onPress: onUpdateOverlayPressed)
+                UpdateAvailableOverlayView(
+                    version: state.updateVersion,
+                    onPress: onUpdateOverlayPressed
+                )
                     .padding(.horizontal, 18)
             } else {
                 ZStack {
@@ -1866,7 +1879,10 @@ struct RecordingOverlayView: View {
                 FailureIndicatorView()
                     .padding(.horizontal, 12)
             } else if state.phase == .updateAvailable {
-                UpdateAvailableOverlayView(onPress: onUpdateOverlayPressed)
+                UpdateAvailableOverlayView(
+                    version: state.updateVersion,
+                    onPress: onUpdateOverlayPressed
+                )
                     .padding(.horizontal, 12)
             } else {
                 VStack(spacing: 0) {
@@ -2021,6 +2037,7 @@ struct ErrorOverlayView: View {
 }
 
 struct UpdateAvailableOverlayView: View {
+    let version: String
     let onPress: () -> Void
 
     var body: some View {
@@ -2030,7 +2047,7 @@ struct UpdateAvailableOverlayView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
 
-                Text("Update Available")
+                Text(version.isEmpty ? "Update Available" : "OnSpeak \(version) Available")
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
             }
