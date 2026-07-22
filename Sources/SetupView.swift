@@ -1200,16 +1200,61 @@ struct OverlayStylePreview: View {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(Color.black)
                         .overlay(
-                            VStack(alignment: .leading, spacing: 3) {
-                                Capsule()
-                                    .fill(Color.white.opacity(0.8))
-                                    .frame(width: 20, height: 2)
-                                Capsule()
-                                    .fill(Color.white.opacity(0.35))
-                                    .frame(width: 45, height: 2)
+                            Canvas { context, size in
+                                let inset: CGFloat = 6
+                                let columns = 10
+                                let rows = 3
+                                let stepX = (size.width - inset * 2) / CGFloat(columns - 1)
+                                let stepY = (size.height - inset * 2) / CGFloat(rows - 1)
+
+                                var connectors = Path()
+                                for row in 0..<rows {
+                                    let y = inset + CGFloat(row) * stepY
+                                    connectors.move(to: CGPoint(x: inset, y: y))
+                                    connectors.addLine(to: CGPoint(x: size.width - inset, y: y))
+                                }
+                                for column in 0..<columns {
+                                    let x = inset + CGFloat(column) * stepX
+                                    connectors.move(to: CGPoint(x: x, y: inset))
+                                    connectors.addLine(to: CGPoint(x: x, y: size.height - inset))
+                                }
+                                context.stroke(
+                                    connectors,
+                                    with: .color(.white.opacity(0.08)),
+                                    lineWidth: 0.45
+                                )
+
+                                for row in 0..<rows {
+                                    for column in 0..<columns {
+                                        let center = CGPoint(
+                                            x: inset + CGFloat(column) * stepX,
+                                            y: inset + CGFloat(row) * stepY
+                                        )
+                                        let dot = Path(
+                                            ellipseIn: CGRect(
+                                                x: center.x - 0.8,
+                                                y: center.y - 0.8,
+                                                width: 1.6,
+                                                height: 1.6
+                                            )
+                                        )
+                                        context.fill(dot, with: .color(.white.opacity(0.34)))
+                                    }
+                                }
                             }
-                            .padding(5),
-                            alignment: .leading
+                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .trim(from: 0.10, to: 0.60)
+                                .stroke(
+                                    .white.opacity(0.78),
+                                    style: StrokeStyle(lineWidth: 0.75, lineCap: .round)
+                                )
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
                         )
                         .frame(width: 68, height: 24)
                         .padding(.bottom, 5)

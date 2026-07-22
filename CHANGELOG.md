@@ -8,6 +8,21 @@ This project uses semantic versioning for public releases. Use `MAJOR.MINOR.PATC
 - `MINOR` changes add user-visible features and improvements.
 - `PATCH` changes fix bugs, polish existing behavior, or make small internal improvements.
 
+## [0.5.1] - 2026-07-22
+
+### Added
+
+- The OnSpeak website is now published through GitHub Pages with the current app icon and canonical project links.
+
+### Improved
+
+- The bottom listening card now responds to speech with a full-card dot grid and a subtle rotating white edge trace, replacing the previous capsule waveform and colored glow.
+- Dot reactions are larger and distributed across the grid so changes in voice energy are easier to notice while app identity, transcript text, and recording actions remain clear.
+
+### Fixed
+
+- The install command now works for standard macOS accounts by installing OnSpeak to the user's Applications folder without requiring administrator access.
+
 ## [0.5.0] - 2026-07-19
 
 ### Added

@@ -192,35 +192,114 @@ private struct SiriNotchRimShape: Shape {
 /// Full animated rim for the floating card. Unlike the top-mounted notch,
 /// every edge is visible because the card sits away from the screen bezel.
 private struct SiriFloatingCardBorder: View {
-    private let colors: [Color] = [
-        Color(red: 0.18, green: 0.72, blue: 1.00),
-        Color(red: 0.47, green: 0.31, blue: 1.00),
-        Color(red: 0.98, green: 0.24, blue: 0.70),
-        Color(red: 0.35, green: 0.78, blue: 1.00),
-        Color(red: 0.18, green: 0.72, blue: 1.00),
-    ]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let segmentLength: CGFloat = 0.5
+    private let featherLength: CGFloat = 0.0625
+    private let featherSteps = 12
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-            let cycle = timeline.date.timeIntervalSinceReferenceDate
-                .truncatingRemainder(dividingBy: 7.0)
-            let phase = cycle / 7.0 * 360
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
+            let phase = reduceMotion
+                ? 0.0
+                : timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: 7.0) / 7.0
 
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(
-                    AngularGradient(
-                        colors: colors,
-                        center: .center,
-                        startAngle: .degrees(phase),
-                        endAngle: .degrees(phase + 360)
-                    ),
-                    lineWidth: 1.15
+            Canvas { context, size in
+                let perimeter = RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .path(in: CGRect(origin: .zero, size: size))
+                let stroke = StrokeStyle(lineWidth: 1.15, lineCap: .round, lineJoin: .round)
+
+                drawSegment(
+                    in: &context,
+                    path: perimeter,
+                    from: phase,
+                    length: featherLength,
+                    steps: featherSteps,
+                    opacity: { progress in 0.9 * progress },
+                    stroke: stroke
                 )
-                .shadow(color: Color.pink.opacity(0.38), radius: 5)
-                .shadow(color: Color.blue.opacity(0.22), radius: 7)
+                drawSegment(
+                    in: &context,
+                    path: perimeter,
+                    from: phase + featherLength,
+                    length: segmentLength - featherLength * 2,
+                    steps: 1,
+                    opacity: { _ in 0.9 },
+                    stroke: stroke
+                )
+                drawSegment(
+                    in: &context,
+                    path: perimeter,
+                    from: phase + segmentLength - featherLength,
+                    length: featherLength,
+                    steps: featherSteps,
+                    opacity: { progress in 0.9 * (1 - progress) },
+                    stroke: stroke
+                )
+            }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private func drawSegment(
+        in context: inout GraphicsContext,
+        path: Path,
+        from start: Double,
+        length: CGFloat,
+        steps: Int,
+        opacity: (CGFloat) -> CGFloat,
+        stroke: StrokeStyle
+    ) {
+        for index in 0..<steps {
+            let lower = CGFloat(index) / CGFloat(steps)
+            let upper = CGFloat(index + 1) / CGFloat(steps)
+            let startPosition = start + Double(length * lower)
+            let endPosition = start + Double(length * upper)
+            let segmentOpacity = opacity((lower + upper) / 2)
+
+            drawWrappedPath(
+                in: &context,
+                path: path,
+                from: startPosition,
+                to: endPosition,
+                opacity: segmentOpacity,
+                stroke: stroke
+            )
+        }
+    }
+
+    private func drawWrappedPath(
+        in context: inout GraphicsContext,
+        path: Path,
+        from start: Double,
+        to end: Double,
+        opacity: CGFloat,
+        stroke: StrokeStyle
+    ) {
+        let normalizedStart = start.truncatingRemainder(dividingBy: 1)
+        let normalizedEnd = end.truncatingRemainder(dividingBy: 1)
+        let shading = GraphicsContext.Shading.color(.white.opacity(opacity))
+
+        if normalizedStart <= normalizedEnd, end - start < 1 {
+            context.stroke(
+                path.trimmedPath(from: normalizedStart, to: normalizedEnd),
+                with: shading,
+                style: stroke
+            )
+        } else {
+            context.stroke(
+                path.trimmedPath(from: normalizedStart, to: 1),
+                with: shading,
+                style: stroke
+            )
+            context.stroke(
+                path.trimmedPath(from: 0, to: normalizedEnd),
+                with: shading,
+                style: stroke
+            )
+        }
     }
 }
 
@@ -1458,8 +1537,16 @@ private struct BottomListeningCardView: View {
                     .padding(.horizontal, 18)
             } else {
                 ZStack {
-                    cardContent
-                        .opacity(isHovering && showsRecordingActions ? 0.22 : 1)
+                    ZStack {
+                        BottomCardDotGridView(
+                            audioLevel: state.audioLevel,
+                            isRecording: isListening
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                        cardContent
+                    }
+                    .opacity(isHovering && showsRecordingActions ? 0.22 : 1)
 
                     if isHovering && showsRecordingActions {
                         recordingActions
@@ -1527,17 +1614,14 @@ private struct BottomListeningCardView: View {
     @ViewBuilder
     private var centerContent: some View {
         VStack(spacing: 1) {
-            CapsuleWaveformView(
-                audioLevel: state.audioLevel,
-                isActive: isListening
-            )
-            .frame(
-                height: (showsLiveTranscript && !state.liveTranscript.isEmpty)
-                    || state.phase == .transcribing
-                    ? 14
-                    : 28
-            )
-            .padding(.horizontal, 12)
+            Color.clear
+                .frame(
+                    height: (showsLiveTranscript && !state.liveTranscript.isEmpty)
+                        || state.phase == .transcribing
+                        ? 14
+                        : 28
+                )
+                .padding(.horizontal, 12)
 
             if showsLiveTranscript, !state.liveTranscript.isEmpty {
                 CompactLiveTranscriptPreview(text: state.liveTranscript)
@@ -1621,28 +1705,118 @@ private struct CompactOnSpeakBrand: View {
     }
 }
 
-private struct CapsuleWaveformView: View {
+/// A single, bounded drawing surface behind the floating-card content. It uses
+/// the recorder's already-normalized display level and never owns timer state.
+private struct BottomCardDotGridView: View {
     let audioLevel: Float
-    let isActive: Bool
+    let isRecording: Bool
 
-    private static let capsuleCount = 32
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let columns = 24
+    private static let rows = 8
+
+    private var level: CGFloat {
+        guard audioLevel.isFinite else { return 0 }
+        return CGFloat(min(max(audioLevel, 0), 1))
+    }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 3) {
-                ForEach(0..<Self.capsuleCount, id: \.self) { index in
-                    let wave = 0.5 + 0.5 * sin(time * 7.2 - Double(index) * 0.56)
-                    let energy = min(max(Double(audioLevel) * 1.8, 0.08), 1)
-                    let height = 7 + CGFloat(wave * energy * 6)
-                    Capsule()
-                        .fill(.white.opacity(0.68 + wave * energy * 0.28))
-                        .frame(width: 4.5, height: height)
-                }
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 30.0,
+                paused: !isRecording || reduceMotion
+            )
+        ) { timeline in
+            Canvas(rendersAsynchronously: true) { context, size in
+                drawGrid(
+                    in: &context,
+                    size: size,
+                    time: reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private func drawGrid(
+        in context: inout GraphicsContext,
+        size: CGSize,
+        time: TimeInterval
+    ) {
+        let insetX: CGFloat = 12
+        let insetY: CGFloat = 10
+        let usableWidth = max(0, size.width - insetX * 2)
+        let usableHeight = max(0, size.height - insetY * 2)
+        guard usableWidth > 0, usableHeight > 0 else { return }
+
+        let columnSpacing = usableWidth / CGFloat(Self.columns - 1)
+        let rowSpacing = usableHeight / CGFloat(Self.rows - 1)
+
+        func point(column: Int, row: Int) -> CGPoint {
+            CGPoint(
+                x: insetX + CGFloat(column) * columnSpacing,
+                y: insetY + CGFloat(row) * rowSpacing
+            )
+        }
+
+        func activation(column: Int, row: Int) -> CGFloat {
+            guard isRecording, level > 0 else { return 0 }
+
+            let x = CGFloat(column) / CGFloat(Self.columns - 1)
+            let y = CGFloat(row) / CGFloat(Self.rows - 1)
+            let travellingPhase = time * 3.0 - Double(x * 7.0 + y * 4.0)
+            let ripple = CGFloat(0.5 + 0.5 * sin(travellingPhase))
+            let centerBias = 1 - min(1, abs(y - 0.5) * 1.15)
+            return level * (0.25 + 0.75 * ripple) * (0.62 + 0.38 * centerBias)
+        }
+
+        for row in 0..<Self.rows {
+            for column in 0..<Self.columns {
+                let current = point(column: column, row: row)
+                let currentActivation = activation(column: column, row: row)
+
+                if column + 1 < Self.columns {
+                    let neighbourActivation = activation(column: column + 1, row: row)
+                    var path = Path()
+                    path.move(to: current)
+                    path.addLine(to: point(column: column + 1, row: row))
+                    let strength = max(currentActivation, neighbourActivation)
+                    context.stroke(
+                        path,
+                        with: .color(.white.opacity(0.032 + strength * 0.075)),
+                        lineWidth: 0.45 + strength * 0.18
+                    )
+                }
+
+                if row + 1 < Self.rows {
+                    let neighbourActivation = activation(column: column, row: row + 1)
+                    var path = Path()
+                    path.move(to: current)
+                    path.addLine(to: point(column: column, row: row + 1))
+                    let strength = max(currentActivation, neighbourActivation)
+                    context.stroke(
+                        path,
+                        with: .color(.white.opacity(0.032 + strength * 0.075)),
+                        lineWidth: 0.45 + strength * 0.18
+                    )
+                }
+
+                let diameter = 1.8 + currentActivation * 1.7
+                let dotRect = CGRect(
+                    x: current.x - diameter / 2,
+                    y: current.y - diameter / 2,
+                    width: diameter,
+                    height: diameter
+                )
+                context.fill(
+                    Path(ellipseIn: dotRect),
+                    with: .color(.white.opacity(0.08 + currentActivation * 0.19))
+                )
+            }
+        }
     }
 }
 
