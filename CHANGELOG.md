@@ -8,6 +8,17 @@ This project uses semantic versioning for public releases. Use `MAJOR.MINOR.PATC
 - `MINOR` changes add user-visible features and improvements.
 - `PATCH` changes fix bugs, polish existing behavior, or make small internal improvements.
 
+## [0.7.0] - 2026-07-22
+
+### Improved
+
+- OnSpeak’s transcription and cleanup workflow is now fully on-device, with no API-key or third-party provider setup.
+- Onboarding, Settings, Run Log exports, and troubleshooting surfaces now focus on local dictation and cleanup.
+
+### Removed
+
+- Retired Groq and OpenAI-compatible transcription, realtime, and post-processing integrations.
+
 ## [0.6.0] - 2026-07-22
 
 ### Added
