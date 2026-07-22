@@ -15,11 +15,6 @@ struct AppContext {
     let windowTitle: String?
     let selectedText: String?
     let currentActivity: String
-    let contextSystemPrompt: String?
-    let contextPrompt: String?
-    let screenshotDataURL: String?
-    let screenshotMimeType: String?
-    let screenshotError: String?
 
     var contextSummary: String {
         currentActivity
@@ -28,34 +23,9 @@ struct AppContext {
 
 /// Collects lightweight context through the Accessibility API.
 ///
-/// OnSpeak deliberately does not capture the screen or send app context to a
-/// remote model. The legacy initializer shape is retained while the inherited
-/// settings model is simplified, so existing stored preferences remain safe to
-/// load without adding either behavior back to the runtime.
+/// OnSpeak keeps this context entirely on-device for local workflow metadata.
 final class AppContextService {
-    static let defaultContextModel = "qwen/qwen3.6-27b"
-    static let defaultContextPrompt = """
-Summarize the active app, window, and selected text for a speech-to-text cleanup pipeline.
-Use only the supplied local metadata and never infer private details that are not present.
-"""
-    static let defaultContextPromptDate = "2026-07-18"
-    static let defaultScreenshotMaxDimension: CGFloat = 1024
-
-    init(
-        apiKey: String,
-        baseURL: String = "",
-        customContextPrompt: String = "",
-        contextModel: String = AppContextService.defaultContextModel,
-        screenshotMaxDimension: CGFloat = AppContextService.defaultScreenshotMaxDimension
-    ) {
-        // Intentionally unused: kept for source compatibility while OnSpeak's
-        // local-only settings surface is reduced in follow-up refactors.
-        _ = apiKey
-        _ = baseURL
-        _ = customContextPrompt
-        _ = contextModel
-        _ = screenshotMaxDimension
-    }
+    init() {}
 
     func collectSelectionSnapshot() -> AppSelectionSnapshot {
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
@@ -80,7 +50,7 @@ Use only the supplied local metadata and never infer private details that are no
     /// AppState service instance. Shortcut preflight calls this from a
     /// detached task because AX queries into the focused process may block.
     static func captureSelectionSnapshot() -> AppSelectionSnapshot {
-        AppContextService(apiKey: "").collectSelectionSnapshot()
+        AppContextService().collectSelectionSnapshot()
     }
 
     func collectContext() async -> AppContext {
@@ -90,12 +60,7 @@ Use only the supplied local metadata and never infer private details that are no
                 bundleIdentifier: nil,
                 windowTitle: nil,
                 selectedText: nil,
-                currentActivity: "Dictating in an unrecognized app.",
-                contextSystemPrompt: nil,
-                contextPrompt: nil,
-                screenshotDataURL: nil,
-                screenshotMimeType: nil,
-                screenshotError: nil
+                currentActivity: "Dictating in an unrecognized app."
             )
         }
 
@@ -114,34 +79,8 @@ Use only the supplied local metadata and never infer private details that are no
             bundleIdentifier: frontmostApp.bundleIdentifier,
             windowTitle: windowTitle,
             selectedText: selectedText,
-            currentActivity: activity.isEmpty ? "Dictating in the active app." : "Dictating in \(activity).",
-            contextSystemPrompt: nil,
-            contextPrompt: nil,
-            screenshotDataURL: nil,
-            screenshotMimeType: nil,
-            screenshotError: nil
+            currentActivity: activity.isEmpty ? "Dictating in the active app." : "Dictating in \(activity)."
         )
-    }
-
-    static func activitySummary(from rawContent: String, model: String) -> String? {
-        var content = rawContent
-        if ModelConfiguration.config(for: model).shouldStripThinkTags {
-            content = ModelConfiguration.stripThinkTags(content)
-        }
-
-        let cleaned = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty else { return nil }
-        return normalizedActivitySummary(cleaned)
-    }
-
-    private static func normalizedActivitySummary(_ value: String) -> String {
-        let sentences = value
-            .split(whereSeparator: { $0 == "." || $0 == "。" || $0 == "!" || $0 == "?" })
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        guard sentences.count > 2 else { return value }
-        return sentences.prefix(2).joined(separator: ". ") + "."
     }
 
     private func focusedWindowTitle(from appElement: AXUIElement) -> String? {

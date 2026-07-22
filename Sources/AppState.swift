@@ -22,7 +22,6 @@ struct PrecomputedMacro {
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case dictionary
-    case prompts
     case macros
     case runLog
     case debug
@@ -35,7 +34,6 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "General"
         case .dictionary: return "Dictionary"
-        case .prompts: return "Prompts"
         case .macros: return "Voice Macros"
         case .runLog: return "Run Log"
         case .debug: return "Debug"
@@ -46,7 +44,6 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gearshape"
         case .dictionary: return "character.book.closed"
-        case .prompts: return "text.bubble"
         case .macros: return "music.mic"
         case .runLog: return "clock.arrow.circlepath"
         case .debug: return "wrench.and.screwdriver"
@@ -190,14 +187,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         case muted(previouslyMuted: Bool)
     }
 
-    private let apiKeyStorageKey = "groq_api_key"
-    private let apiBaseURLStorageKey = "api_base_url"
-    private let transcriptionModelStorageKey = "transcription_model"
-    private let transcriptionAPIURLStorageKey = "transcription_api_url"
-    private let transcriptionAPIKeyStorageKey = "transcription_api_key"
-    private let postProcessingModelStorageKey = "post_processing_model"
-    private let postProcessingFallbackModelStorageKey = "post_processing_fallback_model"
-    private let contextModelStorageKey = "context_model"
     private let holdShortcutStorageKey = "hold_shortcut"
     private let copyAgainShortcutStorageKey = "copy_again_shortcut"
     private let savedHoldCustomShortcutStorageKey = "saved_hold_custom_shortcut"
@@ -205,12 +194,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private let customVocabularyStorageKey = "custom_vocabulary"
     private let transcriptionLanguageStorageKey = "transcription_language"
     private let selectedMicrophoneStorageKey = "selected_microphone_id"
-    private let customSystemPromptStorageKey = "custom_system_prompt"
-    private let customContextPromptStorageKey = "custom_context_prompt"
-    private let instructionExecutionGuardEnabledStorageKey = "instruction_execution_guard_enabled"
-    private let customSystemPromptLastModifiedStorageKey = "custom_system_prompt_last_modified"
-    private let customContextPromptLastModifiedStorageKey = "custom_context_prompt_last_modified"
-    private let contextScreenshotMaxDimensionStorageKey = "context_screenshot_max_dimension"
     private let shortcutStartDelayStorageKey = "shortcut_start_delay"
     private let preserveClipboardStorageKey = "preserve_clipboard"
     private let preserveExactWordingStorageKey = "preserve_exact_wording"
@@ -227,18 +210,12 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private let commandModeEnabledStorageKey = "command_mode_enabled"
     private let commandModeStyleStorageKey = "command_mode_style"
     private let commandModeManualModifierStorageKey = "command_mode_manual_modifier"
-    private let outputLanguageStorageKey = "output_language"
-    private let realtimeStreamingEnabledStorageKey = "realtime_streaming_enabled"
-    private let realtimeStreamingModelStorageKey = "realtime_streaming_model"
     private let dictationAudioInterruptionEnabledStorageKey = "dictation_audio_interruption_enabled"
     private let liveTranscriptPreviewEnabledStorageKey = "live_transcript_preview_enabled"
     private let pasteAfterShortcutReleaseDelay: TimeInterval = 0.03
     private let pressEnterAfterPasteDelay: TimeInterval = 0.08
     private let clipboardRestoreDelay: TimeInterval = 1.0
     let maxPipelineHistoryCount = 20
-    static let defaultContextScreenshotMaxDimension = Int(AppContextService.defaultScreenshotMaxDimension)
-    static let contextScreenshotDimensionOptions = [1024, 768, 640, 512]
-    static let defaultTranscriptionModel = "whisper-large-v3"
     static let transcriptionLanguageOptions: [(code: String, name: String)] = [
         ("", "Auto-detect"),
         ("en", "English"),
@@ -271,11 +248,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         ("hu", "Hungarian"),
         ("ca", "Catalan")
     ]
-    static let defaultPostProcessingModel = "openai/gpt-oss-20b"
-    static let defaultPostProcessingFallbackModel = "qwen/qwen3.6-27b"
-    static let defaultContextModel = "qwen/qwen3.6-27b"
-    private static let deprecatedDefaultPostProcessingFallbackModel = "meta-llama/llama-4-scout-17b-16e-instruct"
-    private static let deprecatedDefaultContextModel = "meta-llama/llama-4-scout-17b-16e-instruct"
     private static let trailingPressEnterCommandPattern = try! NSRegularExpression(
         pattern: #"(?i)(?:^|[ \t\r\n,;:\-]+)press[ \t\r\n]+enter[\s\p{P}]*$"#
     )
@@ -283,57 +255,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
     @Published var hasCompletedSetup: Bool {
         didSet {
             UserDefaults.standard.set(hasCompletedSetup, forKey: "hasCompletedSetup")
-        }
-    }
-
-    @Published var apiKey: String {
-        didSet {
-            persistAPIKey(apiKey)
-            rebuildContextService()
-        }
-    }
-
-    @Published var apiBaseURL: String {
-        didSet {
-            persistAPIBaseURL(apiBaseURL)
-            rebuildContextService()
-        }
-    }
-
-    @Published var transcriptionAPIURL: String {
-        didSet {
-            persistOptionalAPIValue(transcriptionAPIURL, account: transcriptionAPIURLStorageKey)
-        }
-    }
-
-    @Published var transcriptionAPIKey: String {
-        didSet {
-            persistOptionalAPIValue(transcriptionAPIKey, account: transcriptionAPIKeyStorageKey)
-        }
-    }
-
-    @Published var transcriptionModel: String {
-        didSet {
-            UserDefaults.standard.set(transcriptionModel, forKey: transcriptionModelStorageKey)
-        }
-    }
-
-    @Published var postProcessingModel: String {
-        didSet {
-            UserDefaults.standard.set(postProcessingModel, forKey: postProcessingModelStorageKey)
-        }
-    }
-
-    @Published var postProcessingFallbackModel: String {
-        didSet {
-            UserDefaults.standard.set(postProcessingFallbackModel, forKey: postProcessingFallbackModelStorageKey)
-        }
-    }
-
-    @Published var contextModel: String {
-        didSet {
-            UserDefaults.standard.set(contextModel, forKey: contextModelStorageKey)
-            rebuildContextService()
         }
     }
 
@@ -401,78 +322,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
         }
     }
 
-    @Published var customSystemPrompt: String {
-        didSet {
-            UserDefaults.standard.set(customSystemPrompt, forKey: customSystemPromptStorageKey)
-        }
-    }
-
-    @Published var customContextPrompt: String {
-        didSet {
-            UserDefaults.standard.set(customContextPrompt, forKey: customContextPromptStorageKey)
-            rebuildContextService()
-        }
-    }
-
-    @Published var instructionExecutionGuardEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(
-                instructionExecutionGuardEnabled,
-                forKey: instructionExecutionGuardEnabledStorageKey
-            )
-        }
-    }
-
-    @Published var contextScreenshotMaxDimension: Int {
-        didSet {
-            let normalizedDimension = Self.normalizedContextScreenshotMaxDimension(contextScreenshotMaxDimension)
-            if normalizedDimension != contextScreenshotMaxDimension {
-                contextScreenshotMaxDimension = normalizedDimension
-            }
-            UserDefaults.standard.set(contextScreenshotMaxDimension, forKey: contextScreenshotMaxDimensionStorageKey)
-            rebuildContextService()
-        }
-    }
-
-    @Published var customSystemPromptLastModified: String {
-        didSet {
-            UserDefaults.standard.set(customSystemPromptLastModified, forKey: customSystemPromptLastModifiedStorageKey)
-        }
-    }
-
-    @Published var customContextPromptLastModified: String {
-        didSet {
-            UserDefaults.standard.set(customContextPromptLastModified, forKey: customContextPromptLastModifiedStorageKey)
-        }
-    }
-
-    @Published var outputLanguage: String {
-        didSet {
-            UserDefaults.standard.set(outputLanguage, forKey: outputLanguageStorageKey)
-        }
-    }
-
     @Published var shortcutStartDelay: TimeInterval {
         didSet {
             UserDefaults.standard.set(shortcutStartDelay, forKey: shortcutStartDelayStorageKey)
-        }
-    }
-
-    /// Stream audio to the transcription backend during recording via the
-    /// OpenAI Realtime WebSocket. Reduces wall-clock latency between "stop"
-    /// and text-ready because most of the transcription work happens while
-    /// the user is still speaking.
-    @Published var realtimeStreamingEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(realtimeStreamingEnabled, forKey: realtimeStreamingEnabledStorageKey)
-        }
-    }
-
-    /// Model ID the realtime WebSocket should transcribe with. Empty means
-    /// "use the server's default".
-    @Published var realtimeStreamingModel: String {
-        didSet {
-            UserDefaults.standard.set(realtimeStreamingModel, forKey: realtimeStreamingModelStorageKey)
         }
     }
 
@@ -566,16 +418,12 @@ final class AppState: ObservableObject, @unchecked Sendable {
     @Published var debugStatusMessage = "Idle"
     @Published var lastRawTranscript = ""
     @Published var lastPostProcessedTranscript = ""
-    @Published var lastPostProcessingPrompt = ""
     @Published var lastContextSummary = ""
     @Published var lastPostProcessingStatus = ""
-    @Published var lastContextScreenshotDataURL: String? = nil
-    @Published var lastContextScreenshotStatus = ""
     @Published var lastContextAppName: String = ""
     @Published var lastContextBundleIdentifier: String = ""
     @Published var lastContextWindowTitle: String = ""
     @Published var lastContextSelectedText: String = ""
-    @Published var lastContextLLMPrompt: String = ""
     @Published var launchAtLogin: Bool {
         didSet { setLaunchAtLogin(launchAtLogin) }
     }
@@ -630,16 +478,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         UserDefaults.standard.removeObject(forKey: "saved_toggle_custom_shortcut")
         UserDefaults.standard.removeObject(forKey: "hotkey_option")
         let hasCompletedSetup = UserDefaults.standard.bool(forKey: "hasCompletedSetup")
-        let apiKey = Self.loadStoredAPIKey(account: apiKeyStorageKey)
-        let apiBaseURL = Self.loadStoredAPIBaseURL(account: "api_base_url")
-        let transcriptionModel = UserDefaults.standard.string(forKey: transcriptionModelStorageKey) ?? Self.defaultTranscriptionModel
-        let transcriptionAPIURL = Self.loadOptionalStoredAPIValue(account: transcriptionAPIURLStorageKey)
-        let transcriptionAPIKey = Self.loadStoredAPIKey(account: transcriptionAPIKeyStorageKey)
-        let postProcessingModel = UserDefaults.standard.string(forKey: postProcessingModelStorageKey) ?? Self.defaultPostProcessingModel
-        let postProcessingFallbackModel = Self.loadStoredPostProcessingFallbackModel(
-            key: postProcessingFallbackModelStorageKey
-        )
-        let contextModel = Self.loadStoredContextModel(key: contextModelStorageKey)
         let shortcuts = Self.loadShortcutConfiguration(
             holdKey: holdShortcutStorageKey,
             copyAgainKey: copyAgainShortcutStorageKey
@@ -656,20 +494,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         let transcriptionLanguage = Self.normalizeTranscriptionLanguage(
             UserDefaults.standard.string(forKey: transcriptionLanguageStorageKey) ?? ""
         )
-        let customSystemPrompt = UserDefaults.standard.string(forKey: customSystemPromptStorageKey) ?? ""
-        let customContextPrompt = UserDefaults.standard.string(forKey: customContextPromptStorageKey) ?? ""
-        let instructionExecutionGuardEnabled = UserDefaults.standard.object(
-            forKey: instructionExecutionGuardEnabledStorageKey
-        ) == nil
-            ? true
-            : UserDefaults.standard.bool(forKey: instructionExecutionGuardEnabledStorageKey)
-        let customSystemPromptLastModified = UserDefaults.standard.string(forKey: customSystemPromptLastModifiedStorageKey) ?? ""
-        let customContextPromptLastModified = UserDefaults.standard.string(forKey: customContextPromptLastModifiedStorageKey) ?? ""
-        let outputLanguage = UserDefaults.standard.string(forKey: outputLanguageStorageKey) ?? ""
-        let storedContextScreenshotMaxDimension = UserDefaults.standard.object(forKey: contextScreenshotMaxDimensionStorageKey) != nil
-            ? UserDefaults.standard.integer(forKey: contextScreenshotMaxDimensionStorageKey)
-            : Self.defaultContextScreenshotMaxDimension
-        let contextScreenshotMaxDimension = Self.normalizedContextScreenshotMaxDimension(storedContextScreenshotMaxDimension)
         let shortcutStartDelay = max(0, UserDefaults.standard.double(forKey: shortcutStartDelayStorageKey))
         let isCommandModeEnabled = UserDefaults.standard.object(forKey: commandModeEnabledStorageKey) == nil
             ? false
@@ -697,8 +521,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
             dynamicCleanupEnabled = UserDefaults.standard.bool(forKey: dynamicCleanupEnabledStorageKey)
         }
         let keepDictationInClipboardHistory = UserDefaults.standard.bool(forKey: keepDictationInClipboardHistoryStorageKey)
-        let realtimeStreamingEnabled = UserDefaults.standard.bool(forKey: realtimeStreamingEnabledStorageKey)
-        let realtimeStreamingModel = UserDefaults.standard.string(forKey: realtimeStreamingModelStorageKey) ?? ""
         let dictationAudioInterruptionEnabled = UserDefaults.standard.bool(
             forKey: dictationAudioInterruptionEnabledStorageKey
         )
@@ -738,22 +560,8 @@ final class AppState: ObservableObject, @unchecked Sendable {
 
         let selectedMicrophoneID = UserDefaults.standard.string(forKey: selectedMicrophoneStorageKey) ?? "default"
 
-        self.contextService = Self.makeAppContextService(
-            apiKey: "",
-            baseURL: apiBaseURL,
-            customContextPrompt: customContextPrompt,
-            contextModel: contextModel,
-            contextScreenshotMaxDimension: contextScreenshotMaxDimension
-        )
+        self.contextService = AppContextService()
         self.hasCompletedSetup = hasCompletedSetup
-        self.apiKey = apiKey
-        self.apiBaseURL = apiBaseURL
-        self.transcriptionAPIURL = transcriptionAPIURL
-        self.transcriptionAPIKey = transcriptionAPIKey
-        self.transcriptionModel = transcriptionModel
-        self.postProcessingModel = postProcessingModel
-        self.postProcessingFallbackModel = postProcessingFallbackModel
-        self.contextModel = contextModel
         self.holdShortcut = shortcuts.hold
         self.copyAgainShortcut = shortcuts.copyAgain
         self.savedHoldCustomShortcut = savedHoldCustomShortcut.binding
@@ -763,20 +571,11 @@ final class AppState: ObservableObject, @unchecked Sendable {
         self.commandModeManualModifier = commandModeManualModifier
         self.customVocabulary = customVocabulary
         self.transcriptionLanguage = transcriptionLanguage
-        self.customSystemPrompt = customSystemPrompt
-        self.customContextPrompt = customContextPrompt
-        self.instructionExecutionGuardEnabled = instructionExecutionGuardEnabled
-        self.contextScreenshotMaxDimension = contextScreenshotMaxDimension
-        self.customSystemPromptLastModified = customSystemPromptLastModified
-        self.customContextPromptLastModified = customContextPromptLastModified
-        self.outputLanguage = outputLanguage
         self.shortcutStartDelay = shortcutStartDelay
         self.preserveClipboard = preserveClipboard
         self.preserveExactWording = preserveExactWording
         self.dynamicCleanupEnabled = dynamicCleanupEnabled
         self.keepDictationInClipboardHistory = keepDictationInClipboardHistory
-        self.realtimeStreamingEnabled = realtimeStreamingEnabled
-        self.realtimeStreamingModel = realtimeStreamingModel
         self.dictationAudioInterruptionEnabled = dictationAudioInterruptionEnabled
         self.liveTranscriptPreviewEnabled = liveTranscriptPreviewEnabled
         self.isPressEnterVoiceCommandEnabled = isPressEnterVoiceCommandEnabled
@@ -838,24 +637,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         audioDeviceObservers.removeAll()
     }
 
-    private static func loadStoredAPIKey(account: String) -> String {
-        if let storedKey = AppSettingsStorage.load(account: account), !storedKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return storedKey
-        }
-        return ""
-    }
-
-    private func persistAPIKey(_ value: String) {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            AppSettingsStorage.delete(account: apiKeyStorageKey)
-        } else {
-            AppSettingsStorage.save(trimmed, account: apiKeyStorageKey)
-        }
-    }
-
-    static let defaultAPIBaseURL = "https://api.groq.com/openai/v1"
-
     private struct StoredShortcutConfiguration {
         let hold: ShortcutBinding
         let copyAgain: ShortcutBinding
@@ -872,41 +653,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         let binding: ShortcutBinding?
         let hadStoredValue: Bool
         let didNormalize: Bool
-    }
-
-    private static func loadStoredAPIBaseURL(account: String) -> String {
-        if let stored = AppSettingsStorage.load(account: account), !stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return stored
-        }
-        return defaultAPIBaseURL
-    }
-
-    private static func loadStoredContextModel(key: String) -> String {
-        guard let stored = UserDefaults.standard.string(forKey: key) else {
-            return defaultContextModel
-        }
-
-        let trimmed = stored.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed == deprecatedDefaultContextModel {
-            UserDefaults.standard.set(defaultContextModel, forKey: key)
-            return defaultContextModel
-        }
-
-        return trimmed.isEmpty ? defaultContextModel : trimmed
-    }
-
-    private static func loadStoredPostProcessingFallbackModel(key: String) -> String {
-        guard let stored = UserDefaults.standard.string(forKey: key) else {
-            return defaultPostProcessingFallbackModel
-        }
-
-        let trimmed = stored.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed == deprecatedDefaultPostProcessingFallbackModel {
-            UserDefaults.standard.set(defaultPostProcessingFallbackModel, forKey: key)
-            return defaultPostProcessingFallbackModel
-        }
-
-        return trimmed.isEmpty ? defaultPostProcessingFallbackModel : trimmed
     }
 
     private static func loadShortcutConfiguration(
@@ -960,65 +706,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
             binding: normalizedFallback,
             didUpdateStoredValue: stored.hadStoredValue || normalizedFallback != nil
         )
-    }
-
-    static func normalizedContextScreenshotMaxDimension(_ value: Int) -> Int {
-        contextScreenshotDimensionOptions.contains(value)
-            ? value
-            : defaultContextScreenshotMaxDimension
-    }
-
-    static func makeAppContextService(
-        apiKey: String,
-        baseURL: String,
-        customContextPrompt: String,
-        contextModel: String,
-        contextScreenshotMaxDimension: Int
-    ) -> AppContextService {
-        AppContextService(
-            apiKey: apiKey,
-            baseURL: baseURL,
-            customContextPrompt: customContextPrompt,
-            contextModel: contextModel,
-            screenshotMaxDimension: CGFloat(normalizedContextScreenshotMaxDimension(contextScreenshotMaxDimension))
-        )
-    }
-
-    func makeAppContextService() -> AppContextService {
-        Self.makeAppContextService(
-            apiKey: "",
-            baseURL: apiBaseURL,
-            customContextPrompt: customContextPrompt,
-            contextModel: contextModel,
-            contextScreenshotMaxDimension: contextScreenshotMaxDimension
-        )
-    }
-
-    private func rebuildContextService() {
-        contextService = makeAppContextService()
-    }
-
-    private func persistAPIBaseURL(_ value: String) {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || trimmed == Self.defaultAPIBaseURL {
-            AppSettingsStorage.delete(account: apiBaseURLStorageKey)
-        } else {
-            AppSettingsStorage.save(trimmed, account: apiBaseURLStorageKey)
-        }
-    }
-
-    private func persistOptionalAPIValue(_ value: String, account: String) {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            AppSettingsStorage.delete(account: account)
-        } else {
-            AppSettingsStorage.save(trimmed, account: account)
-        }
-    }
-
-    private static func loadOptionalStoredAPIValue(account: String) -> String {
-        let stored = AppSettingsStorage.load(account: account) ?? ""
-        return stored.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func normalizeTranscriptionLanguage(_ language: String) -> String {
@@ -1190,28 +877,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
             return
         }
 
-        let restoredContext = AppContext(
-            appName: nil,
-            bundleIdentifier: nil,
-            windowTitle: nil,
-            selectedText: nil,
-            currentActivity: item.contextSummary,
-            contextSystemPrompt: item.contextSystemPrompt,
-            contextPrompt: item.contextPrompt,
-            screenshotDataURL: item.contextScreenshotDataURL,
-            screenshotMimeType: item.contextScreenshotDataURL != nil ? "image/jpeg" : nil,
-            screenshotError: nil
-        )
-
-        let postProcessingService = PostProcessingService(
-            apiKey: apiKey,
-            baseURL: apiBaseURL,
-            preferredModel: postProcessingModel,
-            preferredFallbackModel: postProcessingFallbackModel,
-            instructionExecutionGuardEnabled: instructionExecutionGuardEnabled
-        )
         let capturedCustomVocabulary = customVocabulary
-        let capturedCustomSystemPrompt = customSystemPrompt
 
         Task {
             do {
@@ -1223,7 +889,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
 
                 let finalTranscript: String
                 let processingStatus: String
-                let postProcessingPrompt: String
                 let restoredIntent = SessionIntent.fromPersisted(
                     intent: item.intent,
                     selectedText: item.selectedText
@@ -1231,11 +896,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 let result = await self.processTranscript(
                     parsedTranscript.transcript,
                     intent: restoredIntent,
-                    context: restoredContext,
-                    postProcessingService: postProcessingService,
                     customVocabulary: capturedCustomVocabulary,
-                    customSystemPrompt: capturedCustomSystemPrompt,
-                    outputLanguage: self.outputLanguage,
                     preserveExactWording: self.preserveExactWording,
                     dynamicCleanupEnabled: self.dynamicCleanupEnabled,
                     dynamicCleanupSessionID: nil
@@ -1246,7 +907,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
                     parsedTranscript: parsedTranscript,
                     isRetry: true
                 )
-                postProcessingPrompt = result.prompt
 
                 await MainActor.run {
                     let updatedItem = PipelineHistoryItem(
@@ -1257,13 +917,13 @@ final class AppState: ObservableObject, @unchecked Sendable {
                         timestamp: item.timestamp,
                         rawTranscript: parsedTranscript.transcript,
                         postProcessedTranscript: finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines),
-                        postProcessingPrompt: postProcessingPrompt,
-                        systemPrompt: item.systemPrompt,
+                        postProcessingPrompt: nil,
+                        systemPrompt: nil,
                         contextSummary: item.contextSummary,
-                        contextSystemPrompt: item.contextSystemPrompt,
-                        contextPrompt: item.contextPrompt,
-                        contextScreenshotDataURL: item.contextScreenshotDataURL,
-                        contextScreenshotStatus: item.contextScreenshotStatus,
+                        contextSystemPrompt: nil,
+                        contextPrompt: nil,
+                        contextScreenshotDataURL: nil,
+                        contextScreenshotStatus: "",
                         postProcessingStatus: processingStatus,
                         debugStatus: "Retried",
                         customVocabulary: item.customVocabulary,
@@ -1296,13 +956,13 @@ final class AppState: ObservableObject, @unchecked Sendable {
                         timestamp: item.timestamp,
                         rawTranscript: item.rawTranscript,
                         postProcessedTranscript: item.postProcessedTranscript,
-                        postProcessingPrompt: item.postProcessingPrompt,
-                        systemPrompt: item.systemPrompt,
+                        postProcessingPrompt: nil,
+                        systemPrompt: nil,
                         contextSummary: item.contextSummary,
-                        contextSystemPrompt: item.contextSystemPrompt,
-                        contextPrompt: item.contextPrompt,
-                        contextScreenshotDataURL: item.contextScreenshotDataURL,
-                        contextScreenshotStatus: item.contextScreenshotStatus,
+                        contextSystemPrompt: nil,
+                        contextPrompt: nil,
+                        contextScreenshotDataURL: nil,
+                        contextScreenshotStatus: "",
                         postProcessingStatus: "Error: \(error.localizedDescription)",
                         debugStatus: "Retry failed",
                         customVocabulary: item.customVocabulary,
@@ -2348,54 +2008,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
     }
 
     /// Turn a transcription failure into a concise, user-facing message,
-    /// classifying by the locale-independent `URLError.Code` rather than the
-    /// system's English description (which varies across releases and locales).
+    /// preserving the local SpeechAnalyzer failure detail.
     private func formattedTranscriptionError(_ error: Error) -> String {
-        if let code = Self.urlErrorCode(in: error) {
-            switch code {
-            case .notConnectedToInternet, .networkConnectionLost,
-                 .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed:
-                return "No internet — check connection"
-            case .timedOut:
-                return NetworkMonitor.shared.isOnline
-                    ? "Request timed out — try again"
-                    : "No internet — check connection"
-            default:
-                break
-            }
-        }
-
-        let lower = error.localizedDescription.lowercased()
-        if lower.contains("timed out") || lower.contains("timeout") {
-            return NetworkMonitor.shared.isOnline
-                ? "Request timed out — try again"
-                : "No internet — check connection"
-        }
-        if lower.contains("offline") || lower.contains("internet connection")
-            || lower.contains("not connected") || lower.contains("network")
-            || lower.contains("cannot find host") {
-            return "No internet — check connection"
-        }
         return error.localizedDescription
-    }
-
-    /// Find a `URLError.Code` anywhere in the error's underlying-error chain,
-    /// so a wrapped transport error is still classified by its root cause.
-    private static func urlErrorCode(in error: Error) -> URLError.Code? {
-        var current: Error? = error
-        var depth = 0
-        while let err = current, depth < 8 {
-            if let urlError = err as? URLError {
-                return urlError.code
-            }
-            let nsError = err as NSError
-            if nsError.domain == NSURLErrorDomain {
-                return URLError.Code(rawValue: nsError.code)
-            }
-            current = nsError.userInfo[NSUnderlyingErrorKey] as? Error
-            depth += 1
-        }
-        return nil
     }
 
     func showMicrophonePermissionAlert() {
@@ -2507,18 +2122,13 @@ final class AppState: ObservableObject, @unchecked Sendable {
         case basicCleanup
         case dynamicCleanup
         case dynamicCleanupFailedFallback(reason: String)
-        case postProcessingSucceeded
-        case postProcessingFailedFallback
         case preservedExactWording
-        case preservedExactWordingTranslated
-        case preservedExactWordingTranslationFailedFallback
-        case commandModeSucceeded(invocation: CommandInvocation)
         case commandModeFailedFallback(invocation: CommandInvocation)
 
         func statusMessage(isRetry: Bool = false) -> String {
             switch self {
             case .skippedEmptyRawTranscript:
-                return "Skipped macros and post-processing for empty raw transcript"
+                return "Skipped cleanup for empty raw transcript"
             case .voiceMacro(let command):
                 return "Voice macro used: \(command)"
             case .basicCleanup:
@@ -2531,20 +2141,8 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 // tuning data for the golden suite.
                 let base = "Dynamic Cleanup unavailable — pasted basic cleanup"
                 return reason.isEmpty ? base : "\(base) (\(reason))"
-            case .postProcessingSucceeded:
-                return isRetry ? "Post-processing succeeded (retried)" : "Post-processing succeeded"
-            case .postProcessingFailedFallback:
-                return isRetry
-                    ? "Post-processing failed on retry, using raw transcript"
-                    : "Post-processing failed, using raw transcript"
             case .preservedExactWording:
-                return "Preserved exact wording, skipped post-processing"
-            case .preservedExactWordingTranslated:
-                return "Preserved exact wording, translated to output language"
-            case .preservedExactWordingTranslationFailedFallback:
-                return "Verbatim translation failed, using untranslated raw transcript"
-            case .commandModeSucceeded(let invocation):
-                return "Edit mode succeeded (\(invocation.rawValue))"
+                return "Preserved exact wording, skipped cleanup"
             case .commandModeFailedFallback(let invocation):
                 return "Edit mode failed, using selected text (\(invocation.rawValue))"
             }
@@ -2554,34 +2152,30 @@ final class AppState: ObservableObject, @unchecked Sendable {
     private func processTranscript(
         _ rawTranscript: String,
         intent: SessionIntent,
-        context: AppContext,
-        postProcessingService: PostProcessingService,
         customVocabulary: String,
-        customSystemPrompt: String,
-        outputLanguage: String = "",
         preserveExactWording: Bool,
         dynamicCleanupEnabled: Bool = false,
         dynamicCleanupSessionID: UUID? = nil
-    ) async -> (finalTranscript: String, outcome: TranscriptProcessingOutcome, prompt: String) {
+    ) async -> (finalTranscript: String, outcome: TranscriptProcessingOutcome) {
         let trimmedRawTranscript = rawTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmedRawTranscript.isEmpty else {
-            return ("", .skippedEmptyRawTranscript, "")
+            return ("", .skippedEmptyRawTranscript)
         }
 
         if case .command(let invocation, let selectedText) = intent {
             // Edit Mode will be restored only after it has an on-device
             // implementation. Never fall back to the inherited cloud path.
-            return (selectedText, .commandModeFailedFallback(invocation: invocation), "")
+            return (selectedText, .commandModeFailedFallback(invocation: invocation))
         }
 
         if let macro = findMatchingMacro(for: trimmedRawTranscript) {
             os_log(.info, log: recordingLog, "Voice macro triggered: %{public}@", macro.command)
-            return (macro.payload, .voiceMacro(command: macro.command), "")
+            return (macro.payload, .voiceMacro(command: macro.command))
         }
 
         if preserveExactWording {
-            return (trimmedRawTranscript, .preservedExactWording, "")
+            return (trimmedRawTranscript, .preservedExactWording)
         }
 
         // Fast local path: conservative filler, stutter, repetition and
@@ -2595,11 +2189,11 @@ final class AppState: ObservableObject, @unchecked Sendable {
         // 0.2.0), and any thrown failure returns it as `.dynamicCleanupFailedFallback`
         // so a paste never ends up empty or errored when the tidier had output.
         guard dynamicCleanupEnabled else {
-            return (tidiedTranscript, .basicCleanup, "")
+            return (tidiedTranscript, .basicCleanup)
         }
         let processor = AppleFoundationModelsPostProcessor.shared
         guard case .available = await processor.availability() else {
-            return (tidiedTranscript, .basicCleanup, "")
+            return (tidiedTranscript, .basicCleanup)
         }
         do {
             let request = DynamicCleanupRequest(
@@ -2607,9 +2201,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
                 vocabulary: Self.dictionaryBiasingTerms()
             )
             let response = try await processor.cleanup(request, sessionID: dynamicCleanupSessionID)
-            return (response.text, .dynamicCleanup, response.prompt)
+            return (response.text, .dynamicCleanup)
         } catch {
-            return (tidiedTranscript, .dynamicCleanupFailedFallback(reason: error.localizedDescription), "")
+            return (tidiedTranscript, .dynamicCleanupFailedFallback(reason: error.localizedDescription))
         }
     }
 
@@ -2664,9 +2258,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         lastPostProcessedTranscript = ""
         lastContextSummary = ""
         lastPostProcessingStatus = ""
-        lastPostProcessingPrompt = ""
-        lastContextScreenshotDataURL = nil
-        lastContextScreenshotStatus = ""
         isRecording = false
         restoreAudioInterruptionIfNeeded()
         isTranscribing = true
@@ -2701,14 +2292,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
             self.statusText = "Transcribing..."
             self.debugStatusMessage = "Transcribing audio"
 
-        let postProcessingService = PostProcessingService(
-            apiKey: apiKey,
-            baseURL: apiBaseURL,
-            preferredModel: postProcessingModel,
-            preferredFallbackModel: postProcessingFallbackModel,
-            instructionExecutionGuardEnabled: instructionExecutionGuardEnabled
-        )
-
             let activeStreamingSession = self.nativeStreamingSession
             self.nativeStreamingSession = nil
             self.audioRecorder.onPCM16Samples = nil
@@ -2740,7 +2323,7 @@ final class AppState: ObservableObject, @unchecked Sendable {
                     )
                     try Task.checkCancellation()
                     // Capture the parsed raw transcript as lastTranscript before
-                    // post-processing runs. If anything after this throws or focus
+                    // cleanup runs. If anything after this throws or focus
                     // shifts mid-paste, the Paste Again shortcut still has the raw
                     // text instead of the previous dictation's stale value.
                     let bootstrapTranscript = parsedTranscript.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2759,16 +2342,12 @@ final class AppState: ObservableObject, @unchecked Sendable {
                     }
                     try Task.checkCancellation()
                     await MainActor.run { [weak self] in
-                        self?.debugStatusMessage = "Running post-processing"
+                        self?.debugStatusMessage = "Running cleanup"
                     }
                     let result = await self.processTranscript(
                         parsedTranscript.transcript,
                         intent: sessionIntent,
-                        context: appContext,
-                        postProcessingService: postProcessingService,
                         customVocabulary: self.customVocabulary,
-                        customSystemPrompt: self.customSystemPrompt,
-                        outputLanguage: self.outputLanguage,
                         preserveExactWording: self.preserveExactWording,
                         dynamicCleanupEnabled: self.dynamicCleanupEnabled,
                         dynamicCleanupSessionID: self.dynamicCleanupSessionID
@@ -2778,28 +2357,22 @@ final class AppState: ObservableObject, @unchecked Sendable {
                     await MainActor.run {
                         guard self.isTranscribing else { return }
                         self.lastContextSummary = appContext.contextSummary
-                        self.lastContextScreenshotDataURL = appContext.screenshotDataURL
-                        self.lastContextScreenshotStatus = ""
                         self.lastContextAppName = appContext.appName ?? ""
                         self.lastContextBundleIdentifier = appContext.bundleIdentifier ?? ""
                         self.lastContextWindowTitle = appContext.windowTitle ?? ""
                         self.lastContextSelectedText = appContext.selectedText ?? ""
-                        self.lastContextLLMPrompt = appContext.contextPrompt ?? ""
                         let trimmedRawTranscript = parsedTranscript.transcript
                         let trimmedFinalTranscript = result.finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
                         let processingStatus = Self.statusMessage(
                             for: result.outcome,
                             parsedTranscript: parsedTranscript
                         )
-                        self.lastPostProcessingPrompt = result.prompt
                         self.lastRawTranscript = trimmedRawTranscript
                         self.lastPostProcessedTranscript = trimmedFinalTranscript
                         self.lastPostProcessingStatus = processingStatus
                         self.recordPipelineHistoryEntry(
                             rawTranscript: trimmedRawTranscript,
                             postProcessedTranscript: trimmedFinalTranscript,
-                            postProcessingPrompt: result.prompt,
-                            systemPrompt: Self.resolvedSystemPrompt(self.customSystemPrompt),
                             context: appContext,
                             processingStatus: processingStatus,
                             intent: sessionIntent,
@@ -2822,15 +2395,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
                         let shouldPressEnterAfterPaste = parsedTranscript.shouldPressEnterAfterPaste
 
                         let shouldPersistRawDictationFallback: Bool
-                        switch result.outcome {
-                        case .postProcessingFailedFallback,
-                             .preservedExactWordingTranslationFailedFallback,
-                             .dynamicCleanupFailedFallback:
-                            // Same brief failure indicator as post-processing:
-                            // signal that a fallback happened while still pasting
-                            // the tidied text.
+                        if case .dynamicCleanupFailedFallback = result.outcome {
                             shouldPersistRawDictationFallback = !trimmedFinalTranscript.isEmpty
-                        default:
+                        } else {
                             shouldPersistRawDictationFallback = false
                         }
 
@@ -2900,14 +2467,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
                         self.lastRawTranscript = ""
                         self.lastContextSummary = ""
                         self.lastPostProcessingStatus = "Error: \(error.localizedDescription)"
-                        self.lastPostProcessingPrompt = ""
-                        self.lastContextScreenshotDataURL = resolvedContext.screenshotDataURL
-                        self.lastContextScreenshotStatus = ""
                         self.recordPipelineHistoryEntry(
                             rawTranscript: "",
                             postProcessedTranscript: "",
-                            postProcessingPrompt: "",
-                            systemPrompt: Self.resolvedSystemPrompt(self.customSystemPrompt),
                             context: resolvedContext,
                             processingStatus: "Error: \(error.localizedDescription)",
                             intent: sessionIntent,
@@ -2921,17 +2483,9 @@ final class AppState: ObservableObject, @unchecked Sendable {
         }
     }
 
-    static func resolvedSystemPrompt(_ customSystemPrompt: String) -> String {
-        customSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? PostProcessingService.defaultSystemPrompt
-            : customSystemPrompt
-    }
-
     private func recordPipelineHistoryEntry(
         rawTranscript: String,
         postProcessedTranscript: String,
-        postProcessingPrompt: String,
-        systemPrompt: String,
         context: AppContext,
         processingStatus: String,
         intent: SessionIntent,
@@ -2944,12 +2498,12 @@ final class AppState: ObservableObject, @unchecked Sendable {
             timestamp: Date(),
             rawTranscript: rawTranscript,
             postProcessedTranscript: postProcessedTranscript,
-            postProcessingPrompt: postProcessingPrompt,
-            systemPrompt: systemPrompt,
+            postProcessingPrompt: nil,
+            systemPrompt: nil,
             contextSummary: context.contextSummary,
-            contextSystemPrompt: context.contextSystemPrompt,
-            contextPrompt: context.contextPrompt,
-            contextScreenshotDataURL: context.screenshotDataURL,
+            contextSystemPrompt: nil,
+            contextPrompt: nil,
+            contextScreenshotDataURL: nil,
             contextScreenshotStatus: "",
             postProcessingStatus: processingStatus,
             debugStatus: debugStatusMessage,
@@ -3046,8 +2600,6 @@ final class AppState: ObservableObject, @unchecked Sendable {
         capturedContext = nil
         lastContextSummary = "Collecting app context..."
         lastPostProcessingStatus = ""
-        lastContextScreenshotDataURL = nil
-        lastContextScreenshotStatus = ""
 
         contextCaptureTask = Task { [weak self] in
             guard let self else { return nil }
@@ -3055,13 +2607,10 @@ final class AppState: ObservableObject, @unchecked Sendable {
             await MainActor.run {
                 self.capturedContext = context
                 self.lastContextSummary = context.contextSummary
-                self.lastContextScreenshotDataURL = context.screenshotDataURL
-                self.lastContextScreenshotStatus = ""
                 self.lastContextAppName = context.appName ?? ""
                 self.lastContextBundleIdentifier = context.bundleIdentifier ?? ""
                 self.lastContextWindowTitle = context.windowTitle ?? ""
                 self.lastContextSelectedText = context.selectedText ?? ""
-                self.lastContextLLMPrompt = context.contextPrompt ?? ""
                 self.lastPostProcessingStatus = "App context captured"
             }
             return context
@@ -3076,18 +2625,8 @@ final class AppState: ObservableObject, @unchecked Sendable {
             bundleIdentifier: frontmostApp?.bundleIdentifier,
             windowTitle: windowTitle,
             selectedText: nil,
-            currentActivity: "Could not refresh app context at stop time; using text-only post-processing.",
-            contextSystemPrompt: resolvedContextSystemPrompt(),
-            contextPrompt: nil,
-            screenshotDataURL: nil,
-            screenshotMimeType: nil,
-            screenshotError: nil
+            currentActivity: "Could not refresh app context at stop time."
         )
-    }
-
-    private func resolvedContextSystemPrompt() -> String {
-        let trimmedPrompt = customContextPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedPrompt.isEmpty ? AppContextService.defaultContextPrompt : trimmedPrompt
     }
 
     private func focusedWindowTitle(for app: NSRunningApplication?) -> String? {

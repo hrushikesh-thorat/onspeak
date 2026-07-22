@@ -75,14 +75,14 @@ endif
 test: $(TEST_RUNNER)
 	@$(TEST_RUNNER)
 
-$(TEST_RUNNER): Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Sources/DynamicCleanup/DynamicCleanupGuard.swift Sources/Dictionary/DictionaryTermLearner.swift Sources/Dictionary/DictionaryStore.swift Sources/LiveTranscriptComposer.swift Sources/LiveTranscriptSessionSupport.swift Sources/UpdateChecker.swift Tests/AppContextServiceTests.swift Tests/ShortcutTests.swift Tests/TranscriptTidierTests.swift Tests/DynamicCleanupGuardTests.swift Tests/DictionaryTermLearnerTests.swift Tests/DictionaryStoreTests.swift Tests/LiveTranscriptComposerTests.swift Tests/LiveTranscriptSessionSupportTests.swift Tests/UpdateCheckerTests.swift
+$(TEST_RUNNER): Sources/TranscriptTidier.swift Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Sources/DynamicCleanup/DynamicCleanupGuard.swift Sources/Dictionary/DictionaryTermLearner.swift Sources/Dictionary/DictionaryStore.swift Sources/LiveTranscriptComposer.swift Sources/LiveTranscriptSessionSupport.swift Sources/UpdateChecker.swift Tests/TestRunner.swift Tests/ShortcutTests.swift Tests/TranscriptTidierTests.swift Tests/DynamicCleanupGuardTests.swift Tests/DictionaryTermLearnerTests.swift Tests/DictionaryStoreTests.swift Tests/LiveTranscriptComposerTests.swift Tests/LiveTranscriptSessionSupportTests.swift Tests/UpdateCheckerTests.swift
 	@mkdir -p "$(BUILD_DIR)"
 	swiftc \
 		-parse-as-library \
 		-o "$(TEST_RUNNER)" \
 		-sdk $(shell xcrun --show-sdk-path) \
 		-target $(ARCH)-apple-macosx26.0 \
-		Sources/AppContextService.swift Sources/LLMAPITransport.swift Sources/ModelConfiguration.swift Sources/TranscriptTidier.swift Tests/AppContextServiceTests.swift Tests/TranscriptTidierTests.swift \
+		Sources/TranscriptTidier.swift Tests/TestRunner.swift Tests/TranscriptTidierTests.swift \
 		Sources/ShortcutCore/ShortcutMatcher.swift Sources/ShortcutCore/ShortcutModels.swift Tests/ShortcutTests.swift \
 		Sources/DynamicCleanup/DynamicCleanupGuard.swift Tests/DynamicCleanupGuardTests.swift \
 		Sources/Dictionary/DictionaryTermLearner.swift Sources/Dictionary/DictionaryStore.swift Tests/DictionaryTermLearnerTests.swift Tests/DictionaryStoreTests.swift \

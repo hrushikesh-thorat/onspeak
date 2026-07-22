@@ -5,15 +5,13 @@ import UniformTypeIdentifiers
 /// Exports a pipeline history item as a self-contained ZIP.
 ///
 /// ZIP contents:
-///   case.json       – metadata, transcripts, context, prompts, settings
-///   screenshot.jpg  – JPEG decoded from context screenshot data URL (if available)
+///   case.json       – metadata, transcripts, and local settings
 ///   audio.*         – original audio recording (if available)
 struct TestCaseExporter {
 
     enum ExportError: Error, LocalizedError {
         case tempDirectoryCreationFailed(underlying: Error?)
         case zipFailed(Int32)
-        case screenshotDecodeFailed
         case missingAudioFile(String)
 
         var errorDescription: String? {
@@ -24,7 +22,6 @@ struct TestCaseExporter {
                 }
                 return "Could not create temporary export directory"
             case .zipFailed(let code): return "zip exited with code \(code)"
-            case .screenshotDecodeFailed: return "Could not decode screenshot data URL"
             case .missingAudioFile(let fileName): return "Missing audio file for export: \(fileName)"
             }
         }
@@ -84,15 +81,6 @@ struct TestCaseExporter {
             throw ExportError.tempDirectoryCreationFailed(underlying: error)
         }
 
-        // Screenshot
-        var screenshotPath: String? = nil
-        if let dataURL = item.contextScreenshotDataURL {
-            guard let imageData = decodeDataURL(dataURL) else { throw ExportError.screenshotDecodeFailed }
-            let ext = dataURL.hasPrefix("data:image/png") ? "png" : "jpg"
-            try imageData.write(to: tempDir.appendingPathComponent("screenshot.\(ext)"))
-            screenshotPath = "./screenshot.\(ext)"
-        }
-
         // Audio
         var audioPath: String? = nil
         if let audioFileName = item.audioFileName {
@@ -104,17 +92,13 @@ struct TestCaseExporter {
             audioPath = "./\(audioFileName)"
         }
 
-        // Build pipeline dict
+        // Build local processing record.
         var pipeline: [String: Any] = [
             "raw_transcript": item.rawTranscript,
             "post_processed_transcript": item.postProcessedTranscript,
             "context_summary": item.contextSummary,
-            "context_prompt": item.contextPrompt ?? "",
-            "post_processing_prompt": item.postProcessingPrompt ?? "",
-            "post_processing_status": item.postProcessingStatus,
-            "screenshot_status": item.contextScreenshotStatus
+            "post_processing_status": item.postProcessingStatus
         ]
-        if let path = screenshotPath { pipeline["screenshot_path"] = path }
         if let path = audioPath { pipeline["audio_path"] = path }
 
         let json: [String: Any] = [
@@ -131,9 +115,7 @@ struct TestCaseExporter {
             ] as [String: Any],
             "pipeline": pipeline,
             "settings": [
-                "custom_vocabulary": item.customVocabulary,
-                "system_prompt": item.systemPrompt ?? "",
-                "context_system_prompt": item.contextSystemPrompt ?? ""
+                "custom_vocabulary": item.customVocabulary
             ] as [String: Any]
         ]
 
@@ -157,12 +139,6 @@ struct TestCaseExporter {
         } else {
             try fm.moveItem(at: destinationTemp, to: destination)
         }
-    }
-
-    private static func decodeDataURL(_ dataURL: String) -> Data? {
-        guard let commaIndex = dataURL.lastIndex(of: ",") else { return nil }
-        let base64 = String(dataURL[dataURL.index(after: commaIndex)...])
-        return Data(base64Encoded: base64, options: .ignoreUnknownCharacters)
     }
 
     private static func isoTimestamp(from date: Date = Date()) -> String {

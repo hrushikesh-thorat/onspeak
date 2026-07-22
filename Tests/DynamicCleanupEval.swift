@@ -25,7 +25,7 @@ import Darwin
 // Golden-case provenance:
 //   - Self-correction, dictated-punctuation, and developer-syntax examples
 //     are adapted from the retired cloud prompt's documented behaviors
-//     (`Sources/PostProcessingService.swift`, `defaultSystemPrompt`).
+//     (the retired cloud cleanup behavior documented in earlier releases).
 //   - Instruction-preservation cases assert the model never generates the
 //     content an embedded instruction describes — it only cleans the
 //     literal spoken words.
